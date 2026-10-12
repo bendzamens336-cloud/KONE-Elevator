@@ -1,0 +1,15 @@
+{
+  "name": "KONE Elevator Simulator",
+  "short_name": "KONE Elevator",
+  "description": "KONE elevator simulator with multiple tower maps.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#05090c",
+  "theme_color": "#1450f5",
+  "orientation": "any",
+  "icons": [
+    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png"}
+  ]
+}

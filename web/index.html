@@ -1,0 +1,2237 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#071015" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="KONE Elevator" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <title>KONE Elevator Simulator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #05090c;
+      --panel: rgba(13, 22, 28, 0.92);
+      --panel2: rgba(19, 31, 39, 0.94);
+      --line: rgba(214, 236, 246, 0.14);
+      --text: #eef8ff;
+      --muted: #9db0bc;
+      --cyan: #69e7ff;
+      --green: #41ff8a;
+      --amber: #ffc85a;
+      --red: #ff525f;
+      --steel: linear-gradient(135deg, #5c6870, #b4c0c6 18%, #566168 42%, #d7e0e4 63%, #5a666d 100%);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(40, 130, 165, .18), transparent 33%),
+        radial-gradient(circle at 80% 0%, rgba(64, 255, 160, .10), transparent 25%),
+        linear-gradient(#071015, #030608 68%);
+    }
+
+    .noise {
+      position: fixed; inset: 0; pointer-events: none; opacity: .05; z-index: 50;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+    }
+
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: grid; }
+
+    /* MENU */
+    #menu {
+      place-items: center;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .tower-lines { position: absolute; inset: 0; opacity: .25; pointer-events: none; }
+    .tower-line { position: absolute; bottom: -6vh; width: 14vw; min-width: 130px; border: 1px solid rgba(110,230,255,.22); background: linear-gradient(180deg, transparent, rgba(65,165,195,.08)); box-shadow: 0 0 40px rgba(69, 208, 255, .05) inset; }
+    .tower-line::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 16px, rgba(116,222,255,.2) 17px 18px); }
+    .tower-line:nth-child(1){left:5%;height:68vh}.tower-line:nth-child(2){left:22%;height:45vh}.tower-line:nth-child(3){right:23%;height:58vh}.tower-line:nth-child(4){right:4%;height:78vh}
+
+    .menu-card {
+      position: relative;
+      width: min(760px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      padding: clamp(26px, 6vw, 62px);
+      background: linear-gradient(145deg, rgba(18,31,39,.97), rgba(5,10,14,.94));
+      box-shadow: 0 28px 90px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.03) inset;
+      text-align: center;
+      backdrop-filter: blur(14px);
+    }
+    .eyebrow { letter-spacing: .28em; text-transform: uppercase; color: var(--cyan); font-weight: 800; font-size: 12px; }
+    h1 { font-size: clamp(44px, 10vw, 104px); line-height: .85; margin: 18px 0 12px; letter-spacing: -.06em; }
+    h1 span { display: block; color: transparent; -webkit-text-stroke: 1px rgba(180,239,255,.78); text-shadow: 0 0 32px rgba(89,225,255,.16); }
+    .subtitle { margin: 20px auto 30px; max-width: 560px; color: var(--muted); font-size: clamp(15px, 2.3vw, 19px); line-height: 1.6; }
+    .menu-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .primary, .secondary {
+      min-width: 210px; border-radius: 16px; padding: 15px 22px; cursor: pointer; font-weight: 850; letter-spacing: .03em; border: 1px solid transparent; transition: .2s ease;
+    }
+    .primary { background: linear-gradient(135deg, #58e8ff, #42ff96); color: #021014; box-shadow: 0 12px 34px rgba(66,255,150,.18); }
+    .secondary { border-color: var(--line); background: rgba(255,255,255,.04); }
+    .primary:hover, .secondary:hover { transform: translateY(-2px); filter: brightness(1.08); }
+    .menu-note { margin-top: 24px; color: #6f8490; font-size: 12px; }
+    .map-picker { margin: 0 auto 24px; max-width: 650px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; text-align:left; }
+    .map-choice { border:1px solid var(--line); border-radius:15px; padding:12px; background:rgba(255,255,255,.035); cursor:pointer; transition:.18s ease; min-width:0; }
+    .map-choice:hover { transform:translateY(-1px); border-color:rgba(105,231,255,.42); }
+    .map-choice.active { border-color:var(--cyan); background:linear-gradient(145deg,rgba(35,121,148,.30),rgba(22,72,65,.23)); box-shadow:0 0 0 1px rgba(105,231,255,.14) inset; }
+    .map-choice b { display:block; font-size:13px; margin-bottom:4px; }
+    .map-choice span { display:block; color:var(--muted); font-size:10px; line-height:1.35; overflow-wrap:anywhere; }
+    .menu-kone-logo { display:block; width:min(430px,88%); max-height:146px; object-fit:contain; margin:0 auto 12px; border-radius:16px; box-shadow:0 16px 38px rgba(0,0,0,.28); }
+    @media(max-width:620px){ .map-picker{grid-template-columns:1fr;} .menu-kone-logo{max-height:100px;} }
+
+    /* GAME LAYOUT */
+    #game { grid-template-rows: auto 1fr; min-height: 100vh; }
+    .topbar {
+      display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center;
+      position: sticky; top: 0; z-index: 30; padding: 12px 18px; border-bottom: 1px solid var(--line);
+      background: rgba(4,9,12,.86); backdrop-filter: blur(18px);
+    }
+    .brand { font-weight: 950; letter-spacing: -.03em; }
+    .brand b { color: var(--cyan); }
+    .shift-stats { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+    .stat-pill { border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 999px; padding: 7px 11px; font-size: 12px; color: var(--muted); }
+    .stat-pill strong { color: var(--text); margin-left: 6px; }
+    .warning-dots { display:inline-flex; gap:4px; margin-left:7px; vertical-align:middle; }
+    .warning-dot { width:10px; height:10px; border-radius:50%; background:#66757d; border:1px solid rgba(255,255,255,.32); box-shadow:inset 0 0 0 1px rgba(0,0,0,.16); }
+    .warning-dot.active { background:#000; border-color:#ffc85a; box-shadow:0 0 7px rgba(255,200,90,.45); }
+    .top-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .icon-btn { width: 38px; height: 38px; border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 11px; cursor: pointer; }
+
+    .game-shell {
+      display: grid; grid-template-columns: minmax(520px, 1fr) minmax(380px, 520px); gap: 16px;
+      padding: 16px; align-items: start; max-width: 1720px; width: 100%; margin: 0 auto;
+    }
+
+    .bank, .console { border: 1px solid var(--line); border-radius: 24px; background: var(--panel); box-shadow: 0 18px 50px rgba(0,0,0,.34); overflow: hidden; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .section-head h2 { margin: 0; font-size: 16px; letter-spacing: .02em; }
+    .small { color: var(--muted); font-size: 12px; }
+
+    .elevators { display: grid; grid-template-columns: minmax(180px, 210px) 1fr; gap: 16px; padding: 18px; background: linear-gradient(180deg, rgba(255,255,255,.03), transparent); align-items:start; }
+    body.free-mode .elevators { grid-template-columns:minmax(180px, 210px) 1fr; }
+    .shift-side-widgets { display:grid; gap:14px; align-content:start; }
+    body.free-mode .shift-side-widgets { display:grid; }
+    body.free-mode .passenger-talk { display:none; }
+    .passenger-talk { border:1px solid rgba(105,231,255,.28); border-radius:16px; padding:12px; background:linear-gradient(145deg,rgba(8,23,31,.95),rgba(4,10,14,.95)); min-height:154px; box-shadow:inset 0 0 24px rgba(105,231,255,.04); }
+    .passenger-talk-head { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#9fefff; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+    .passenger-talk-person { display:flex; gap:9px; align-items:center; margin-top:12px; }
+    .passenger-talk-avatar { width:38px; height:38px; display:grid; place-items:center; border-radius:50%; background:#17242b; border:1px solid rgba(255,255,255,.16); font-size:22px; }
+    .passenger-talk-mode { color:var(--muted); font-size:10px; }
+    .passenger-talk-bubble { position:relative; margin-top:12px; padding:11px 12px; border-radius:13px; background:#eefaff; color:#102028; font-size:12px; line-height:1.42; min-height:66px; box-shadow:0 8px 20px rgba(0,0,0,.22); }
+    .passenger-talk-bubble::before { content:''; position:absolute; left:18px; top:-7px; width:14px; height:14px; background:#eefaff; transform:rotate(45deg); }
+    .cctv-box { border:1px solid rgba(255,255,255,.18); border-radius:16px; background:#060a0d; padding:8px; overflow:hidden; }
+    .cctv-head { display:flex; justify-content:space-between; align-items:center; padding:2px 3px 8px; color:#a9bac3; font:800 10px/1.2 monospace; letter-spacing:.06em; }
+    .cctv-rec { color:#ff626d; }
+    .cctv-feed { position:relative; height:168px; overflow:hidden; border:2px solid #23323a; border-radius:10px; background:linear-gradient(180deg,#1275ac,#063f67 55%,#092b47); box-shadow:inset 0 0 28px rgba(0,0,0,.36); }
+    .cctv-feed::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(0deg,transparent 0 4px,rgba(255,255,255,.035) 5px); z-index:8; pointer-events:none; }
+    .cctv-cabin { position:absolute; inset:0; display:grid; place-items:center; background:linear-gradient(180deg,rgba(58,136,175,.52),rgba(7,47,73,.34)); }
+    .cctv-ad { position:absolute; right:7px; top:9px; width:54px; z-index:1; padding:2px; border-radius:3px; background:#d7dde0; box-shadow:0 2px 7px rgba(0,0,0,.42); }
+    .cctv-ad img { display:block; width:100%; height:auto; border-radius:2px; }
+    .cctv-passenger { position:relative; z-index:2; font-size:34px; opacity:0; transition:.25s; transform:translateY(14px); }
+    .cctv-passenger.visible { opacity:1; }
+    .cctv-door { position:absolute; top:0; bottom:0; width:50.5%; z-index:4; background-image:linear-gradient(rgba(255,255,255,.07),rgba(0,0,0,.09)),url('assets/door-metal.jpg'); background-size:cover; transition:transform 2.05s cubic-bezier(.45,.02,.24,1); }
+    .cctv-door.left { left:0; border-right:1px solid #263138; }
+    .cctv-door.right { right:0; border-left:1px solid #d6e3e8; transform:scaleX(-1); }
+    .cctv-feed.open .cctv-door.left { transform:translateX(-99%); }
+    .cctv-feed.open .cctv-door.right { transform:translateX(99%) scaleX(-1); }
+    .cctv-feed.jammed .cctv-door.left { transform:translateX(-34%); }
+    .cctv-feed.jammed .cctv-door.right { transform:translateX(34%) scaleX(-1); }
+    .cctv-floor { position:absolute; right:6px; bottom:5px; z-index:9; padding:3px 6px; border-radius:5px; background:rgba(0,0,0,.68); color:#ffd942; font:900 11px/1 monospace; }
+    .auto-thoughts { border:1px solid rgba(94,255,160,.24); border-radius:16px; padding:12px; background:linear-gradient(145deg,rgba(7,25,20,.96),rgba(4,12,10,.96)); min-height:128px; box-shadow:inset 0 0 24px rgba(94,255,160,.035); }
+    .auto-thoughts-head { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#8affc0; font-size:10px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+    .auto-thoughts-state { padding:3px 7px; border-radius:999px; border:1px solid rgba(255,255,255,.14); color:#9fb5ad; background:#0b1512; }
+    .auto-thoughts-state.on { color:#a7ffd0; border-color:rgba(94,255,160,.38); background:rgba(30,120,70,.16); box-shadow:0 0 12px rgba(94,255,160,.08); }
+    .auto-thoughts-main { margin-top:10px; color:#e7fff1; font-size:12px; line-height:1.42; min-height:44px; }
+    .auto-thoughts-event { margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.09); color:#89a99a; font-size:10px; line-height:1.35; }
+    .floor-window-note { color:#81949e; font-size:10px; }
+    @media (max-width:820px){ .elevators{grid-template-columns:1fr}.shift-side-widgets{grid-template-columns:1fr 1fr}.cctv-feed{height:150px} }
+    @media (max-width:560px){ .shift-side-widgets{grid-template-columns:1fr} }
+    .elevator-unit { border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 12px; background: linear-gradient(145deg, #222c32, #0a0f12); position: relative; cursor: pointer; transition: .2s; }
+    .elevator-unit.selected { box-shadow: 0 0 0 2px var(--cyan), 0 0 34px rgba(105,231,255,.15); }
+    .elevator-label { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-weight:900; }
+    .select-tag { color: var(--cyan); font-size: 10px; letter-spacing:.12em; text-transform:uppercase; opacity:0; }
+    .selected .select-tag { opacity:1; }
+
+    .indicator {
+      height: 78px; border-radius: 10px; border: 2px solid #111; background: #030604; display:grid; grid-template-columns: 1fr 64px; align-items:center; padding: 8px 12px; margin-bottom: 10px;
+      box-shadow: 0 0 0 1px #54636a, 0 0 18px rgba(88,255,130,.12) inset;
+    }
+    .floor-display { font: 900 48px/1 "Consolas", "Courier New", monospace; color: #68ff79; text-shadow: 0 0 16px rgba(104,255,121,.85); letter-spacing: .06em; }
+    .dir-img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; display:none; }
+    .dir-img.visible { display:block; }
+    .idle-dot { width: 12px; height: 12px; border-radius:50%; background:#58ff8b; box-shadow:0 0 14px #58ff8b; justify-self:center; }
+
+    .door-frame { position:relative; height: min(52vw, 430px); min-height: 300px; max-height: 430px; border: 9px solid #515e65; border-bottom-width: 13px; overflow:hidden; background: radial-gradient(circle at center, #21333b, #080b0d 65%); box-shadow: 0 0 0 2px #c4d0d5 inset, 0 14px 22px rgba(0,0,0,.5); }
+    .cabin { position:absolute; inset:0; display:grid; place-items:center; background: linear-gradient(180deg,#61727a 0,#202b30 40%,#11171a 100%); }
+    .cabin::before { content:""; position:absolute; inset:0; background: repeating-linear-gradient(90deg, transparent 0 28px, rgba(255,255,255,.025) 29px 30px); }
+    .cabin-light { width:60%; height:12px; top:18px; position:absolute; background:#e7fbff; box-shadow:0 0 30px 10px rgba(209,248,255,.35); border-radius:100%; }
+    .cabin-ad { position:absolute; right:12px; top:88px; width:112px; padding:5px; border-radius:7px; background:#d7dde0; border:1px solid rgba(255,255,255,.6); box-shadow:0 4px 12px rgba(0,0,0,.38); z-index:1; }
+    .cabin-ad img { display:block; width:100%; height:auto; border-radius:3px; }
+    .passenger { font-size: 64px; filter: drop-shadow(0 8px 8px rgba(0,0,0,.45)); transform:translateY(22px); opacity:0; transition:.3s; }
+    .passenger.visible { opacity:1; }
+    .passenger.stack { display:flex; align-items:flex-end; justify-content:center; white-space:nowrap; min-width:120px; }
+    .passenger.stack .stack-person { display:inline-block; margin-left:-34px; filter:drop-shadow(0 6px 5px rgba(0,0,0,.35)); }
+    .passenger.stack .stack-person:first-child { margin-left:0; }
+    .passenger.stack .stack-more { margin-left:6px; align-self:center; font:900 15px/1.1 Arial,sans-serif; color:#fff; background:#0b1115; border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:6px 8px; box-shadow:0 4px 12px rgba(0,0,0,.35); }
+    .passenger-rating {
+      position:absolute; z-index:6; left:50%; top:34%; transform:translate(-50%,-100%);
+      display:flex; gap:3px; padding:5px 8px; border-radius:999px; background:rgba(4,9,12,.86);
+      border:1px solid rgba(255,255,255,.18); box-shadow:0 5px 18px rgba(0,0,0,.38);
+      font-size:18px; line-height:1; letter-spacing:1px; pointer-events:none;
+    }
+    .passenger-rating[hidden] { display:none !important; }
+    .passenger-rating .star { color:#ffd329; text-shadow:0 0 7px rgba(255,193,7,.45); }
+    .passenger-rating .star.empty { color:#4d5960; text-shadow:none; }
+    .door { position:absolute; top:0; bottom:0; width:50.3%; background-image: linear-gradient(rgba(255,255,255,.08), rgba(0,0,0,.08)), url('assets/door-metal.jpg'); background-size: cover; transition: transform 2.05s cubic-bezier(.45,.02,.24,1); z-index:3; box-shadow: inset 0 0 18px rgba(0,0,0,.3); }
+    .door.left { left:0; border-right:2px solid #263138; transform:translateX(0); }
+    .door.right { right:0; border-left:2px solid #d6e3e8; transform:translateX(0) scaleX(-1); }
+    .door-frame.open .door.left { transform:translateX(-99%); }
+    .door-frame.open .door.right { transform:translateX(99%) scaleX(-1); }
+    .door-frame.moving { box-shadow: 0 0 0 2px #c4d0d5 inset, 0 14px 22px rgba(0,0,0,.5), 0 0 30px rgba(105,231,255,.12); }
+
+    .unit-status { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:10px; color:var(--muted); font-size:12px; }
+    .speed { color:var(--amber); font-family:monospace; }
+    .queue-mini { grid-column:1/-1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#758b96; }
+
+    .mission-zone { padding: 0 18px 18px; }
+    .mission-card { border:1px solid var(--line); border-radius:16px; padding:14px; background:rgba(0,0,0,.24); display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; }
+    .mission-icon { width:46px; height:46px; border-radius:13px; display:grid; place-items:center; background:rgba(105,231,255,.1); font-size:24px; }
+    .mission-main strong { display:block; margin-bottom:3px; }
+    .mission-main span { color:var(--muted); font-size:12px; }
+    .mission-time { font:900 19px/1 monospace; color:var(--amber); }
+    .mission-card.done { border-color:rgba(65,255,138,.35); }
+    .mission-card.urgent { border-color:rgba(255,82,95,.5); animation:pulse 1s infinite alternate; }
+    @keyframes pulse { to { box-shadow:0 0 24px rgba(255,82,95,.15); } }
+
+    /* CONSOLE */
+    .console { position: sticky; top: 79px; max-height: calc(100vh - 95px); display:grid; grid-template-rows:auto auto auto auto minmax(220px,1fr) auto; }
+    .active-selector { display:flex; gap:8px; }
+    .lift-select { border:1px solid var(--line); border-radius:10px; padding:8px 12px; background:rgba(255,255,255,.04); cursor:pointer; font-weight:800; }
+    .lift-select.active { background:var(--cyan); color:#041015; }
+    .console-readout { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line); }
+    .readout-cell { background:#030706; border:1px solid #223037; border-radius:11px; padding:10px; text-align:center; }
+    .readout-cell label { display:block; color:#6f858e; font-size:9px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:4px; }
+    .readout-cell b { color:#76ff8c; font:800 18px/1.2 monospace; }
+
+    .door-controls { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px 14px; border-bottom:1px solid var(--line); }
+    .door-control { border:1px solid var(--line); background:rgba(255,255,255,.03); border-radius:15px; padding:8px; cursor:pointer; display:grid; grid-template-columns:58px 1fr; gap:10px; align-items:center; user-select:none; touch-action:none; }
+    .door-control img { width:58px; height:58px; border-radius:50%; }
+    .door-control b { display:block; font-size:13px; }
+    .door-control small { color:var(--muted); font-size:10px; }
+    .door-control.pressed { transform:translateY(2px); background:rgba(105,231,255,.08); box-shadow:0 0 0 1px var(--cyan) inset; }
+
+    .service-subpanel {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(0,0,0,.08));
+    }
+    .service-panel-inner {
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 16px;
+      padding: 10px;
+      background: linear-gradient(145deg, rgba(20,29,34,.96), rgba(7,11,14,.96));
+      box-shadow: 0 8px 24px rgba(0,0,0,.24), inset 0 0 0 1px rgba(255,255,255,.025);
+      display: grid;
+      gap: 9px;
+    }
+    .ecodisc-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      min-height: 78px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.035);
+      padding: 7px 12px;
+    }
+    .ecodisc-logo img {
+      width: min(168px, 46%);
+      height: 64px;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 8px 22px rgba(0,0,0,.28);
+      background: #1450f5;
+    }
+    .ecodisc-logo-text { min-width: 0; }
+    .ecodisc-logo-text b { display:block; font-size:13px; letter-spacing:.05em; }
+    .ecodisc-logo-text span { display:block; margin-top:4px; color:var(--muted); font-size:10px; line-height:1.35; }
+    .alarm-control {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid rgba(255,82,95,.45);
+      border-radius: 13px;
+      padding: 8px 11px;
+      display: grid;
+      grid-template-columns: 40px 1fr 14px;
+      gap: 10px;
+      align-items: center;
+      text-align: left;
+      cursor: pointer;
+      background: linear-gradient(145deg, rgba(100,20,26,.42), rgba(42,10,13,.76));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+      transition: .16s ease;
+    }
+    .alarm-control:hover { filter: brightness(1.1); }
+    .alarm-control:active { transform: translateY(2px); }
+    .alarm-symbol {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: #8d151e;
+      border: 1px solid #ff6d77;
+      color: #fff;
+      font-size: 22px;
+      box-shadow: 0 0 16px rgba(255,82,95,.2);
+    }
+    .alarm-copy b { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+    .alarm-copy small { display:block; margin-top:3px; color:#cfaeb2; font-size:9px; }
+    .alarm-led {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #4e1519;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+    .alarm-control.active {
+      border-color: #ff6671;
+      background: linear-gradient(145deg, rgba(185,24,38,.75), rgba(67,7,13,.94));
+      animation: alarmPanelPulse .72s infinite alternate;
+    }
+    .alarm-control.active .alarm-symbol { background:#e51f2f; box-shadow:0 0 22px rgba(255,40,55,.72); }
+    .alarm-control.active .alarm-led { background:#ff3141; box-shadow:0 0 15px #ff3141; }
+    @keyframes alarmPanelPulse {
+      from { box-shadow: inset 0 0 0 1px rgba(255,255,255,.025), 0 0 0 rgba(255,49,65,0); }
+      to { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 0 24px rgba(255,49,65,.28); }
+    }
+
+    .floor-panel-wrap { min-height:0; display:grid; grid-template-rows:auto 1fr; }
+    .floor-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; }
+    .floor-toolbar input { width:110px; border:1px solid var(--line); background:#060b0e; color:var(--text); border-radius:10px; padding:8px 10px; }
+    .floor-panel { overflow:auto; padding:4px 12px 14px; display:grid; grid-template-columns:repeat(10,minmax(36px,1fr)); gap:6px; align-content:start; scrollbar-color:#40545e #0b1115; }
+    .floor-btn { aspect-ratio:1; border:0; border-radius:50%; padding:0; position:relative; cursor:pointer; background:transparent url('assets/button-idle.jpg') center/cover no-repeat; min-width:36px; color:#070707; font-weight:950; text-shadow:0 1px 0 rgba(255,255,255,.7); transition:.12s; }
+    .floor-btn:hover { transform:scale(1.06); filter:brightness(1.12); }
+    .floor-btn.active { background-image:url('assets/button-active.jpg'); color:#fff; text-shadow:0 0 7px #fff; }
+    .floor-btn.call { box-shadow:0 0 0 2px var(--amber), 0 0 14px rgba(255,200,90,.7); }
+    .floor-btn.current::after { content:""; position:absolute; inset:-3px; border:2px solid var(--cyan); border-radius:50%; box-shadow:0 0 8px rgba(72,194,255,.85); }
+    .floor-btn.passing { box-shadow:0 0 0 3px #2a9fff, 0 0 18px 6px rgba(42,159,255,.9), inset 0 0 18px rgba(42,159,255,.75); filter:brightness(1.18) saturate(1.25); }
+    .floor-btn.passing::before { content:""; position:absolute; inset:7px; border-radius:50%; background:rgba(30,144,255,.30); pointer-events:none; }
+    .floor-btn.passing { animation:passingFloorPulse .42s ease-in-out infinite alternate; }
+    @keyframes passingFloorPulse { from { transform:scale(1); } to { transform:scale(1.045); } }
+
+    .console-footer { border-top:1px solid var(--line); padding:10px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .toggle { display:flex; gap:8px; align-items:center; color:var(--muted); font-size:11px; }
+    .auto-toggle { padding:7px 10px; border:1px solid rgba(105,231,255,.28); border-radius:10px; background:rgba(105,231,255,.06); color:#bfefff; font-weight:850; }
+    .wait-timer-control { display:flex; align-items:center; gap:7px; padding:7px 10px; border:1px solid rgba(255,200,90,.25); border-radius:10px; background:rgba(255,200,90,.05); color:#ffe0a0; font-weight:800; font-size:12px; }
+    .wait-timer-control select { background:#071014; color:#fff; border:1px solid #40545e; border-radius:7px; padding:4px 7px; font-weight:800; }
+    body.free-mode #waitTimerControl { display:none !important; }
+    .toggle input { accent-color:var(--cyan); }
+    .new-call { border:1px solid rgba(255,200,90,.35); background:rgba(255,200,90,.08); color:var(--amber); border-radius:10px; padding:8px 11px; cursor:pointer; font-size:11px; font-weight:800; }
+    .new-call:disabled { opacity:.38; cursor:not-allowed; filter:grayscale(.35); }
+
+    .toast-stack { position:fixed; right:18px; bottom:18px; z-index:60; display:grid; gap:8px; width:min(340px,calc(100vw - 36px)); pointer-events:none; }
+    .toast { background:rgba(10,18,23,.96); border:1px solid var(--line); border-left:4px solid var(--cyan); border-radius:13px; padding:12px 14px; box-shadow:0 16px 40px rgba(0,0,0,.45); animation:toastIn .3s ease, toastOut .35s ease 3.2s forwards; }
+    .toast strong { display:block; font-size:13px; margin-bottom:2px; }
+    .toast span { color:var(--muted); font-size:11px; }
+    @keyframes toastIn { from { transform:translateX(30px); opacity:0; } }
+    @keyframes toastOut { to { transform:translateX(30px); opacity:0; } }
+
+    .help-overlay { position:fixed; inset:0; z-index:90; display:none; place-items:center; padding:20px; background:rgba(0,0,0,.72); backdrop-filter:blur(10px); }
+    .help-overlay.visible { display:grid; }
+    .help-card { width:min(620px,100%); border:1px solid var(--line); border-radius:22px; padding:24px; background:#0c151a; box-shadow:0 30px 90px #000; }
+    .help-card h3 { margin-top:0; }
+    .help-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .help-item { border:1px solid var(--line); border-radius:12px; padding:12px; color:var(--muted); font-size:13px; }
+    .help-item b { color:var(--text); display:block; margin-bottom:4px; }
+
+    @media (max-width: 1040px) {
+      .game-shell { grid-template-columns:1fr; }
+      .console { position:relative; top:auto; max-height:none; }
+      .floor-panel { max-height:440px; }
+      .door-frame { height:430px; }
+    }
+    @media (max-width: 650px) {
+      .topbar { grid-template-columns:1fr auto; }
+      .shift-stats { grid-column:1/-1; grid-row:2; justify-content:flex-start; overflow:auto; flex-wrap:nowrap; }
+      .game-shell { padding:8px; }
+      .elevators { grid-template-columns:1fr; padding:10px; }
+      .door-frame { height:380px; }
+      .console-readout { grid-template-columns:1fr 1fr 1fr; }
+      .door-controls { grid-template-columns:1fr; }
+      .floor-panel { grid-template-columns:repeat(5,1fr); }
+      .help-grid { grid-template-columns:1fr; }
+    }
+  
+    /* KONE 1000 update */
+    .indicator {
+      position: relative;
+      min-height: 104px;
+      height: 104px;
+      background: #000 url('assets/kone-display.jpg') center/contain no-repeat;
+      grid-template-columns: 1fr 70px;
+      overflow: hidden;
+    }
+    .floor-display {
+      color: #ffd329;
+      text-shadow: 0 0 7px #ffb000, 0 0 16px rgba(255,190,0,.72);
+      font-size: clamp(38px, 5vw, 54px);
+      letter-spacing: .04em;
+      z-index: 2;
+    }
+    .indicator .idle-dot { background:#ffd329; box-shadow:0 0 14px #ffbf00; }
+    .cabin-icons {
+      position:absolute;
+      z-index:2;
+      top:46px;
+      left:12px;
+      display:grid;
+      grid-template-columns:repeat(2,46px);
+      gap:7px;
+      padding:7px;
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:10px;
+      background:rgba(10,15,17,.72);
+      box-shadow:0 7px 18px rgba(0,0,0,.3);
+    }
+    .cabin-icons img { width:46px; height:46px; object-fit:contain; border-radius:6px; background:#fff; }
+    .door-area { display:grid; grid-template-columns:64px minmax(0,1fr); gap:10px; align-items:start; }
+    .door-signal-slot { height:100%; display:flex; align-items:flex-start; justify-content:center; padding-top:18px; }
+    .door-signal-panel { width:56px; padding:6px; border-radius:10px; background:linear-gradient(180deg,#4b555a,#1a2024); border:1px solid rgba(255,255,255,.22); box-shadow:inset 0 0 0 1px rgba(0,0,0,.65),0 7px 18px rgba(0,0,0,.3); }
+    .door-signal-panel img { display:block; width:44px; height:44px; object-fit:cover; border-radius:50%; background:#050505; transition:transform .16s ease; }
+    @media (max-width:650px){ .door-area{grid-template-columns:50px minmax(0,1fr);gap:7px}.door-signal-panel{width:46px;padding:5px}.door-signal-panel img{width:36px;height:36px} }
+    .floor-panel { grid-template-columns:repeat(8,minmax(42px,1fr)); }
+    .floor-btn { min-width:42px; font-size:11px; }
+    @media (max-width:650px){ .floor-panel{grid-template-columns:repeat(5,minmax(42px,1fr));} }
+
+
+    /* Passenger safety + free-mode manual maintenance add-on. */
+    body.free-mode .shift-stats,
+    body.free-mode .mission-zone,
+    body.free-mode #newCallBtn { display:none !important; }
+
+    .passenger.boarding {
+      opacity:1;
+      z-index:5;
+      animation: passengerBoarding 2.6s ease-in-out both;
+    }
+    .passenger.jammed {
+      opacity:1;
+      z-index:7;
+      transform:translateY(22px) scale(.94);
+      animation: passengerJammed .28s ease-in-out infinite alternate;
+      filter:drop-shadow(0 8px 8px rgba(0,0,0,.45)) drop-shadow(0 0 14px rgba(255,82,95,.65));
+    }
+    @keyframes passengerBoarding {
+      0% { opacity:0; transform:translate(-120px,22px) scale(.86); }
+      18% { opacity:1; }
+      75% { transform:translate(8px,22px) scale(1); }
+      100% { opacity:1; transform:translateY(22px) scale(1); }
+    }
+    @keyframes passengerJammed { from{transform:translate(-3px,22px) scale(.94)} to{transform:translate(3px,22px) scale(.94)} }
+    .door-frame.jammed .door { transition:transform .8s cubic-bezier(.4,.02,.35,1); }
+    .door-frame.jammed .door.left { transform:translateX(-34%); }
+    .door-frame.jammed .door.right { transform:translateX(34%) scaleX(-1); }
+    .door-frame.jammed::after {
+      content:"⚠"; position:absolute; z-index:8; left:50%; top:18%; transform:translateX(-50%);
+      width:44px; height:44px; border-radius:50%; display:grid; place-items:center;
+      color:#140405; background:#ffcf4a; border:2px solid #fff1aa; font-size:25px;
+      box-shadow:0 0 24px rgba(255,82,95,.72); animation:jamWarn .45s infinite alternate;
+    }
+    @keyframes jamWarn { to{transform:translateX(-50%) scale(1.12);filter:brightness(1.2)} }
+
+    .free-service-action { padding:0 18px 18px; display:grid; gap:10px; }
+    .free-service-action[hidden] { display:none !important; }
+    .free-service-status {
+      border:1px solid var(--line); border-radius:14px; padding:11px 13px;
+      background:rgba(0,0,0,.24); display:flex; align-items:center; justify-content:space-between; gap:12px;
+      color:var(--muted); font-size:12px;
+    }
+    .free-service-status strong { color:var(--green); text-align:right; }
+    .free-service-status strong.fault { color:var(--red); }
+    .free-service-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .break-lift-btn, .repair-launch {
+      min-height:52px; border-radius:14px; font-weight:900; cursor:pointer; border:1px solid var(--line);
+    }
+    .break-lift-btn { background:linear-gradient(135deg,rgba(255,200,90,.20),rgba(109,65,5,.45)); border-color:rgba(255,200,90,.42); }
+    .repair-launch { background:linear-gradient(135deg,rgba(147,25,36,.86),rgba(67,9,15,.96)); border-color:rgba(255,82,95,.52); }
+    .repair-launch[hidden] { display:none; }
+    .break-lift-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+    .repair-card { width:min(820px,100%); max-height:calc(100vh - 36px); overflow:auto; border:1px solid var(--line); border-radius:24px; padding:22px; background:#091116; box-shadow:0 30px 90px #000; }
+    .repair-card h3 { margin:0 0 5px; }
+    .repair-sub { color:var(--muted); font-size:12px; margin-bottom:16px; }
+    .machine-room { display:grid; grid-template-columns:220px 1fr; gap:18px; align-items:center; border:1px solid var(--line); border-radius:18px; padding:16px; background:linear-gradient(145deg,#151f24,#070b0e); }
+    .ecodisc-wheel { width:190px; aspect-ratio:1; border-radius:50%; margin:auto; display:grid; place-items:center; position:relative; background:radial-gradient(circle,#071014 0 32%,#a5b1b7 33% 42%,#273139 43% 55%,#79868d 56% 65%,#10171b 66%); box-shadow:0 0 0 2px #b7c2c7 inset,0 18px 34px rgba(0,0,0,.48); }
+    .ecodisc-wheel::after { content:""; position:absolute; width:54%; height:13%; border-radius:999px; background:linear-gradient(90deg,#39464c,#d1d9dc,#39464c); box-shadow:0 0 0 2px #10171b; }
+    .ecodisc-wheel span { z-index:2; color:#ffc85a; font-weight:950; text-align:center; font-size:13px; line-height:1.15; }
+    .repair-grid { display:grid; grid-template-columns:repeat(3,minmax(110px,1fr)); gap:10px; }
+    .repair-part { min-height:108px; border:1px solid var(--line); border-radius:14px; background:#111a1f; color:var(--text); padding:12px; cursor:default; display:grid; place-items:center; text-align:center; transition:.25s ease; }
+    .repair-part .part-icon { font-size:30px; display:block; margin-bottom:5px; }
+    .repair-part b { font-size:12px; }
+    .repair-part small { display:block; margin-top:4px; color:var(--muted); font-size:9px; }
+    .repair-part.broken { cursor:pointer; border-color:rgba(255,82,95,.72); background:linear-gradient(145deg,rgba(111,19,28,.72),rgba(48,8,13,.92)); box-shadow:0 0 22px rgba(255,82,95,.13); }
+    .repair-part.broken small { color:#ff9ca4; }
+    .repair-part.replacing { animation:replacePart .7s ease both; pointer-events:none; }
+    .repair-part.fixed { border-color:rgba(65,255,138,.58); background:linear-gradient(145deg,rgba(15,75,44,.72),rgba(7,37,25,.92)); }
+    .repair-part.fixed small { color:#7effad; }
+    @keyframes replacePart { 0%{transform:scale(1)} 35%{transform:scale(.78) rotate(-5deg);opacity:.25;filter:brightness(2)} 70%{transform:scale(1.08) rotate(3deg);opacity:1} 100%{transform:scale(1)} }
+    .repair-bottom { margin-top:14px; display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .repair-hint { color:var(--muted); font-size:12px; flex:1; min-width:220px; }
+    .repair-return:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+    @media(max-width:700px){ .machine-room{grid-template-columns:1fr}.ecodisc-wheel{width:150px}.repair-grid{grid-template-columns:repeat(2,minmax(100px,1fr));}.free-service-buttons{grid-template-columns:1fr;} }
+
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+
+  <main id="menu" class="screen active">
+    <div class="tower-lines" aria-hidden="true">
+      <div class="tower-line"></div><div class="tower-line"></div><div class="tower-line"></div><div class="tower-line"></div>
+    </div>
+    <section class="menu-card">
+      <div class="eyebrow">Elevator Control Simulator</div>
+      <img class="menu-kone-logo" src="assets/kone-logo.png" alt="KONE" />
+      <h1>KONE <span id="mapTitle">ORIGINAL</span></h1>
+      <p class="subtitle" id="menuSubtitle">Оригинальная карта: от −10 до 1 000 000 этажа. Вся прежняя логика лифта сохранена.</p>
+      <div class="map-picker" id="mapPicker" aria-label="Выбор карты">
+        <button class="map-choice active" type="button" data-map="original"><b>Оригинал</b><span>−10 … 1 000 000 этажей</span></button>
+        <button class="map-choice" type="button" data-map="tower1000"><b>Башня 1000</b><span>−10 … 1 000 этажей</span></button>
+        <button class="map-choice" type="button" data-map="mega"><b>Мегабашня</b><span>−10 … 10 000 000 000 000 этажей</span></button>
+      </div>
+      <div class="menu-actions">
+        <button id="startShift" class="primary">Начать смену</button>
+        <button id="freeMode" class="secondary">Свободный режим</button>
+      </div>
+      <div class="menu-note">Один интерфейс для Windows-приложения и мобильной PWA. Звук запускается после нажатия кнопки.</div>
+    </section>
+  </main>
+
+  <main id="game" class="screen">
+    <header class="topbar">
+      <div class="brand">KONE <b>EcoDisc</b></div>
+      <div class="shift-stats">
+        <div class="stat-pill">Режим <strong id="modeText">Смена</strong></div>
+        <div class="stat-pill">Счёт <strong id="scoreText">0</strong></div>
+        <div class="stat-pill">Доставлено <strong id="servedText">0</strong></div>
+        <div class="stat-pill">Вызовы <strong id="callQueueText">0</strong></div>
+        <div class="stat-pill">Предупреждения <span class="warning-dots" id="warningDots"><i class="warning-dot"></i><i class="warning-dot"></i><i class="warning-dot"></i></span></div>
+        <div class="stat-pill">Штрафы <strong id="penaltyText">0</strong>/10</div>
+        <div class="stat-pill">Время <strong id="clockText">00:00</strong>/100:00</div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="soundBtn" title="Звук">🔊</button>
+        <button class="icon-btn" id="helpBtn" title="Помощь">?</button>
+        <button class="icon-btn" id="menuBtn" title="Меню">⌂</button>
+      </div>
+    </header>
+
+    <div class="game-shell">
+      <section class="bank">
+        <div class="section-head">
+          <div><h2>Лифтовой холл</h2><div class="small" id="hallRange">Один лифт B · диапазон −10…1 000 000</div></div>
+          <div class="small" id="buildingStatus">Система в норме</div>
+        </div>
+
+        <div class="elevators">
+          <aside class="shift-side-widgets" id="shiftSideWidgets" aria-label="Пассажир и камера наблюдения">
+            <section class="passenger-talk">
+              <div class="passenger-talk-head"><span>Пассажир говорит</span><span id="talkStatus">ожидание</span></div>
+              <div class="passenger-talk-person"><div class="passenger-talk-avatar">🧍</div><div><strong id="talkPersonTitle">Нет активного пассажира</strong><div class="passenger-talk-mode" id="talkMode">—</div></div></div>
+              <div class="passenger-talk-bubble" id="passengerThought">Следующий вызов появится через 20 секунд.</div>
+            </section>
+            <section class="cctv-box">
+              <div class="cctv-head"><span>CAM B · CABIN</span><span class="cctv-rec">● REC</span></div>
+              <div class="cctv-feed" id="cctvFeed">
+                <div class="cctv-cabin"><div class="cctv-ad"><img src="assets/sealife-ad.jpg" alt="Реклама Sea Life Center and Tower" /></div><div class="cctv-passenger" id="cctvPassenger">🧍</div></div>
+                <div class="cctv-door left"></div><div class="cctv-door right"></div>
+                <div class="cctv-floor" id="cctvFloor">050</div>
+              </div>
+            </section>
+            <section class="auto-thoughts" aria-label="Мысли автоматики">
+              <div class="auto-thoughts-head"><span>Мысли АВТО</span><span class="auto-thoughts-state" id="autoThoughtState">ВЫКЛ</span></div>
+              <div class="auto-thoughts-main" id="autoThought">Автоматика отключена. Управление выполняется вручную.</div>
+              <div class="auto-thoughts-event" id="autoEvent">Последнее событие: —</div>
+            </section>
+          </aside>
+
+          <article class="elevator-unit selected" data-lift="B">
+            <div class="elevator-label"><span>Лифт B</span><span class="select-tag">выбран</span></div>
+            <div class="indicator">
+              <div class="floor-display" id="floorB">050</div>
+              <div>
+                <img class="dir-img" id="upB" src="assets/arrow-up.jpg" alt="Вверх" />
+                <img class="dir-img" id="downB" src="assets/arrow-down.jpg" alt="Вниз" />
+                <div class="idle-dot" id="idleB"></div>
+              </div>
+            </div>
+            <div class="door-area">
+              <div class="door-signal-slot" aria-label="Индикатор открытия и прохождения этажей">
+                <div class="door-signal-panel"><img id="doorSignalB" src="assets/ecounlit.jpg" alt="Индикатор лифта" /></div>
+              </div>
+              <div class="door-frame" id="doorB">
+              <div class="cabin">
+                <div class="cabin-light"></div>
+                <div class="cabin-ad"><img src="assets/sealife-ad.jpg" alt="Реклама Sea Life Center and Tower" /></div>
+                <div class="cabin-icons" aria-label="Пиктограммы лифта">
+                  <img src="assets/no-photo.gif" alt="Фотографировать запрещено" />
+                  <img src="assets/no-smoking.gif" alt="Не курить" />
+                  <img src="assets/elevator-icon.gif" alt="Лифт" />
+                  <img src="assets/handicapped.gif" alt="Доступность" />
+                </div>
+                <div class="passenger-rating" id="passengerRating" hidden aria-label="Оценка пассажира"></div>
+                <div class="passenger" id="passengerB">🧍</div>
+              </div>
+              <div class="door left"></div><div class="door right"></div>
+              </div>
+            </div>
+            <div class="unit-status">
+              <span id="statusB">Двери закрыты</span><span class="speed" id="speedB">0.0 м/с</span>
+              <span class="queue-mini" id="queueB">Маршрут: —</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="mission-zone">
+          <div class="mission-card" id="missionCard">
+            <div class="mission-icon">📟</div>
+            <div class="mission-main"><strong id="missionTitle">Ожидание вызова</strong><span id="missionDetail">Первый пассажир скоро нажмёт кнопку</span></div>
+            <div class="mission-time" id="missionTimer">--</div>
+          </div>
+        </div>
+
+        <div class="free-service-action" id="freeServiceAction" hidden>
+          <div class="free-service-status"><span>Свободный режим · состояние лифта</span><strong id="freeSystemStatus">Система исправна</strong></div>
+          <div class="free-service-buttons">
+            <button class="break-lift-btn" id="breakLiftBtn" type="button">💥 Сломать лифт</button>
+            <button class="repair-launch" id="repairBtn" type="button" hidden>🛠 Починить лифт</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="console">
+        <div class="section-head">
+          <div><h2>Панель управления</h2><div class="small" id="consoleRange">−10…1 000 000 этажей</div></div>
+          <div class="active-selector">
+            <button class="lift-select active" data-select="B">B</button>
+          </div>
+        </div>
+
+        <div class="console-readout">
+          <div class="readout-cell"><label>Лифт</label><b id="activeLiftReadout">B</b></div>
+          <div class="readout-cell"><label>Этаж</label><b id="activeFloorReadout">050</b></div>
+          <div class="readout-cell"><label>Скорость</label><b id="activeSpeedReadout">0.0</b></div>
+        </div>
+
+        <div class="door-controls">
+          <button class="door-control" id="openBtn">
+            <img src="assets/button-open.jpg" alt="Открыть двери" />
+            <span><b>Открыть</b><small>Удерживайте кнопку</small></span>
+          </button>
+          <button class="door-control" id="closeBtn">
+            <img src="assets/button-close.jpg" alt="Закрыть двери" />
+            <span><b>Закрыть</b><small>Удерживайте кнопку</small></span>
+          </button>
+        </div>
+
+        <div class="service-subpanel" aria-label="Служебная подпанель EcoDisc">
+          <div class="service-panel-inner">
+            <div class="ecodisc-logo">
+              <img src="assets/kone-logo.png" alt="KONE" />
+              <div class="ecodisc-logo-text">
+                <b>KONE EcoDisc</b>
+                <span>Привод и служебная подпанель выбранного лифта</span>
+              </div>
+            </div>
+            <button class="alarm-control" id="alarmBtn" type="button" aria-pressed="false">
+              <span class="alarm-symbol" aria-hidden="true">!</span>
+              <span class="alarm-copy"><b id="alarmLabel">Сигнализация</b><small id="alarmHint">Нажмите, чтобы включить непрерывный сигнал</small></span>
+              <span class="alarm-led" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="floor-panel-wrap">
+          <div class="floor-toolbar">
+            <span><span class="small">Выберите этаж</span><br><span class="floor-window-note" id="floorWindowNote">Показаны ближайшие этажи</span></span>
+            <input id="floorSearch" type="number" min="-10" max="1000000" placeholder="−10…1 000 000" aria-label="Номер этажа" />
+          </div>
+          <div class="floor-panel" id="floorPanel" aria-label="Кнопки этажей"></div>
+        </div>
+
+        <div class="console-footer">
+          <label class="toggle"><input id="autoDoor" type="checkbox" checked /> Автодвери</label>
+          <label class="toggle auto-toggle"><input id="autoMode" type="checkbox" /> Режим АВТО</label>
+          <label class="wait-timer-control" id="waitTimerControl">Ожидание
+            <select id="waitTimerSelect" aria-label="Лимит ожидания пассажира">
+              <option value="inf" selected>∞</option>
+              <option value="30">30 с</option>
+              <option value="60">60 с</option>
+              <option value="100">100 с</option>
+            </select>
+          </label>
+          <button class="new-call" id="newCallBtn">+ Новый вызов</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div class="toast-stack" id="toasts"></div>
+
+  <div class="help-overlay" id="helpOverlay">
+    <div class="help-card">
+      <h3>Как играть</h3>
+      <div class="help-grid">
+        <div class="help-item"><b>1. Лифт B</b>В этой версии работает один лифт KONE EcoDisc B.</div>
+        <div class="help-item"><b>2. Выберите этаж</b>Диапазон от −10 до 1 000 000. В панели показывается ближайший диапазон этажей, а любой этаж можно ввести вручную.</div>
+        <div class="help-item"><b>3. Вызовы пассажиров</b>Одновременно активен только один вызов. Новый вызов появляется через 20 секунд после завершения предыдущего. Пока пассажир не обслужен, второй вызов добавить нельзя.</div>
+        <div class="help-item"><b>4. Двери</b>При включённых автодверях они открываются после прибытия и закрываются сами.</div>
+        <div class="help-item"><b>5. Посадка и сигнализация</b>Пассажир заходит с анимацией. Если закрыть двери во время посадки, его прижмёт. Нажмите сигнализацию в течение 10 секунд, чтобы открыть двери без предупреждения.</div>
+        <div class="help-item"><b>6. Предупреждения и штрафы</b>Штраф появляется только после 3 предупреждений. Таймер ожидания можно выбрать: ∞, 30, 60 или 100 секунд. По умолчанию пассажир ждёт бесконечно; одновременно существует только один активный вызов. Если высадить пассажира не на его этаже, предупреждение сохраняется. На 10-м штрафе смена заканчивается.</div><div class="help-item"><b>7. Свободный режим</b>Индикаторы смены скрыты. Здесь доступна кнопка «Сломать лифт» — поломку нужно устранить вручную через технический узел.</div>        <div class="help-item"><b>8. Режим АВТО</b>В свободном режиме лифт сам выбирает этажи. В смене АВТО полностью обслуживает текущего пассажира, отключает кратковременную сигнализацию и умеет экстренно освобождать пассажира при ошибке дверей. Под камерой видны мысли автоматики и последнее событие.</div>
+
+      </div>
+      <button class="primary" id="closeHelp" style="margin-top:18px; width:100%">Понятно</button>
+    </div>
+  </div>
+
+  <div class="help-overlay" id="endOverlay">
+    <div class="help-card">
+      <h3>Смена прекращена</h3>
+      <div class="help-grid">
+        <div class="help-item"><b>Причина</b><span id="endReason">Смена завершена.</span></div>
+        <div class="help-item"><b>Итог</b><span id="endSummary">Счёт: 0 · Доставлено: 0 · Штрафы: 0</span></div>
+      </div>
+      <button class="primary" id="restartShift" style="margin-top:18px; width:100%">Вернуться в меню</button>
+    </div>
+  </div>
+
+  <div class="help-overlay" id="repairOverlay">
+    <div class="repair-card">
+      <h3>🛠 Технический узел KONE EcoDisc</h3>
+      <div class="repair-sub" id="repairFaultName">Найдите и замените повреждённые узлы.</div>
+      <div class="machine-room">
+        <div class="ecodisc-wheel" aria-label="Привод EcoDisc"><span>KONE<br>EcoDisc</span></div>
+        <div class="repair-grid" id="repairGrid"></div>
+      </div>
+      <div class="repair-bottom">
+        <div class="repair-hint" id="repairHint">Красные узлы неисправны. Нажимайте на них по одному, чтобы заменить.</div>
+        <button class="primary repair-return" id="repairReturn" type="button" disabled>Ремонт не завершён</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => [...document.querySelectorAll(sel)];
+      const MIN_FLOOR = -10;
+      const MAPS = {
+        original: { title:'ORIGINAL', name:'Оригинал', max:1_000_000, subtitle:'Оригинальная карта: от −10 до 1 000 000 этажа. Вся прежняя логика лифта сохранена.' },
+        tower1000: { title:'1000', name:'Башня 1000', max:1_000, subtitle:'Компактная карта: от −10 до 1 000 этажа. Остальные системы работают так же.' },
+        mega: { title:'10T', name:'Мегабашня', max:10_000_000_000_000, subtitle:'Экстремальная карта: от −10 до 10 000 000 000 000 этажа. Для дальних поездок используется ускоренная симуляция.' }
+      };
+      let selectedMap = 'original';
+      let MAX_FLOOR = MAPS[selectedMap].max;
+      const FLOOR_HEIGHT_M = 3.2;
+      const SIM_TIME_SCALE = 12; // accelerated game time so long trips stay playable
+      const ULTRA_FLOOR_THRESHOLD = 1001;
+      const ULTRA_MANUAL_MPS = 1_000_000_000; // 1 billion metres per second
+      const ULTRA_AUTO_KMH = 3_000_000_000; // requested AUTO speed in km/h
+      const ULTRA_AUTO_MPS = ULTRA_AUTO_KMH / 3.6;
+      const ULTRA_TRAVEL_SECONDS = 6; // keep million-floor trips visible for a few seconds
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const formatFloor = (n) => {
+        n = Math.round(n);
+        if (n < 0) return String(n);
+        if (n >= 1000) return String(n);
+        return String(n).padStart(3, '0');
+      };
+      const randFloor = (exclude = []) => {
+        let f;
+        do f = MIN_FLOOR + Math.floor(Math.random() * (MAX_FLOOR - MIN_FLOOR + 1)); while (exclude.includes(f));
+        return f;
+      };
+
+      const formatRangeNumber = (n) => new Intl.NumberFormat('ru-RU').format(n);
+      function applyMapConfig(key, announce=false) {
+        const cfg = MAPS[key] || MAPS.original;
+        selectedMap = key in MAPS ? key : 'original';
+        MAX_FLOOR = cfg.max;
+        const mapTitle = document.getElementById('mapTitle');
+        const subtitle = document.getElementById('menuSubtitle');
+        const hallRange = document.getElementById('hallRange');
+        const consoleRange = document.getElementById('consoleRange');
+        if (mapTitle) mapTitle.textContent = cfg.title;
+        if (subtitle) subtitle.textContent = cfg.subtitle;
+        if (hallRange) hallRange.textContent = `Один лифт B · диапазон −10…${formatRangeNumber(MAX_FLOOR)}`;
+        if (consoleRange) consoleRange.textContent = `−10…${formatRangeNumber(MAX_FLOOR)} этажей`;
+        if (els && els.floorSearch) {
+          els.floorSearch.max = String(MAX_FLOOR);
+          els.floorSearch.placeholder = `−10…${formatRangeNumber(MAX_FLOOR)}`;
+        }
+        document.title = `KONE Elevator — ${cfg.name}`;
+        document.querySelectorAll('.map-choice').forEach(btn => btn.classList.toggle('active', btn.dataset.map === selectedMap));
+        if (announce) toast('Карта выбрана', `${cfg.name}: до ${formatRangeNumber(MAX_FLOOR)} этажа.`);
+      }
+
+      const audio = {
+        beep: new Audio('assets/button-kone-025.wav'),
+        arrival: new Audio('assets/arrival-kone.wav'),
+        voice: new Audio('assets/ecoopen-announcement.wav'),
+        alarm: new Audio('assets/alarm-loop.wav'),
+        motor: new Audio('assets/motor-idle.wav'),
+        moveStart: new Audio('assets/ecostart.wav'),
+        move: new Audio('assets/ecomove.wav'),
+        moveStop: new Audio('assets/ecostop.wav'),
+        open: new Audio('assets/door-open-b.wav'),
+        close: new Audio('assets/door-close.wav')
+      };
+      audio.motor.loop = true;
+      audio.alarm.loop = true;
+      audio.move.loop = true;
+      audio.motor.volume = .13;
+      audio.alarm.volume = .72;
+      audio.moveStart.volume = .46;
+      audio.move.volume = .30;
+      audio.moveStop.volume = .48;
+      audio.open.volume = .58;
+      audio.close.volume = .55;
+      audio.arrival.volume = .75;
+      audio.voice.volume = .78;
+      audio.beep.volume = .72;
+
+      let soundOn = true;
+      let alarmOn = false;
+      let doorSignalFlashUntil = 0;
+      let lastPanelPaint = 0;
+      let panelDirty = true;
+      let floorButtons = [];
+
+      function safePlay(sound, restart = true) {
+        if (!soundOn) return;
+        try {
+          if (restart) sound.currentTime = 0;
+          const p = sound.play();
+          if (p) p.catch(() => {});
+        } catch (_) {}
+      }
+      function stopAudio(sound) { try { sound.pause(); sound.currentTime = 0; } catch (_) {} }
+      function startMotor() { if (soundOn) safePlay(audio.motor, false); }
+      function playButtonPress() { safePlay(audio.beep); }
+
+      // Dynamic English elevator voice. It uses the browser/Windows speech engine so
+      // every floor from -10 to 1,000,000 can be announced without 1,011 separate files.
+      let elevatorSpeechToken = 0;
+      function pickElevatorVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        const voices = window.speechSynthesis.getVoices() || [];
+        // Prefer an English male system voice. Voice names vary between Windows,
+        // Chrome and Edge, so keep several common male voice names as fallbacks.
+        const preferred = [
+          /Microsoft David/i, /Microsoft Mark/i, /Microsoft Guy/i,
+          /Microsoft Christopher/i, /Google UK English Male/i,
+          /Daniel/i, /Alex/i, /George/i, /James/i, /Ryan/i, /Male/i
+        ];
+        for (const pattern of preferred) {
+          const v = voices.find(x => pattern.test(x.name) && /^en[-_]/i.test(x.lang || 'en-US'));
+          if (v) return v;
+        }
+        const english = voices.filter(v => /^en[-_]/i.test(v.lang || ''));
+        const notLikelyFemale = english.find(v => !/(aria|zira|samantha|female|jenny|susan|hazel|linda|emma|ava)/i.test(v.name || ''));
+        return notLikelyFemale || english[0] || null;
+      }
+      function speakElevator(text, onDone = null, fallbackMs = 1500) {
+        const token = ++elevatorSpeechToken;
+        if (!soundOn || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+          if (onDone) setTimeout(() => { if (token === elevatorSpeechToken) onDone(); }, 120);
+          return;
+        }
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'en-US';
+          u.rate = 0.90;
+          u.pitch = 0.82;
+          u.volume = 0.95;
+          const voice = pickElevatorVoice();
+          if (voice) u.voice = voice;
+          let finished = false;
+          const finish = () => {
+            if (finished || token !== elevatorSpeechToken) return;
+            finished = true;
+            if (onDone) onDone();
+          };
+          u.onend = finish;
+          u.onerror = finish;
+          window.speechSynthesis.speak(u);
+          if (onDone) setTimeout(finish, fallbackMs);
+        } catch (_) {
+          if (onDone) setTimeout(() => { if (token === elevatorSpeechToken) onDone(); }, 120);
+        }
+      }
+      function cancelElevatorSpeech() {
+        elevatorSpeechToken++;
+        try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (_) {}
+      }
+      function floorVoiceLabel(floor) {
+        const n = Math.round(Number(floor) || 0);
+        if (n < 0) return `minus ${Math.abs(n)}`;
+        return String(n);
+      }
+      function announceDirection(direction) {
+        if (direction > 0) speakElevator('Going up.');
+        else if (direction < 0) speakElevator('Going down.');
+      }
+      function announceFloor(floor, onDone = null) {
+        // The generated male voice announces only the floor number.
+        speakElevator(`Floor ${floorVoiceLabel(floor)}.`, onDone, 1450);
+      }
+      function playOriginalDoorOpeningAnnouncement() {
+        // Restore the original prerecorded door-opening file from the earlier build.
+        safePlay(audio.voice);
+      }
+      function flashDoorSignal(ms = 320) {
+        doorSignalFlashUntil = Math.max(doorSignalFlashUntil, performance.now() + ms);
+      }
+
+      const lift = {
+        id:'B', floor:50, displayFloor:50, target:null, queue:[], moving:false, direction:0,
+        speed:0, cruiseSpeed:0, door:'closed', doorTimer:null, passenger:false, lastDirection:0,
+        pickupFor:null, evacuateOnOpen:false, boardingTimer:null, ultraTravel:null
+      };
+      const lifts = { B: lift };
+      const selected = 'B';
+
+      // Three-stage travel sound: start -> looping cruise -> braking/arrival.
+      let motionAudioPhase = 'idle';
+      let brakePlayedThisTrip = false;
+      let motionStartTimer = null;
+      let arrivalDoorTimer = null;
+
+      function startCruiseAudio() {
+        if (!lift.moving || brakePlayedThisTrip || motionAudioPhase !== 'start') return;
+        motionAudioPhase = 'cruise';
+        safePlay(audio.move, false);
+      }
+
+      function beginMotionAudio() {
+        clearTimeout(motionStartTimer); motionStartTimer = null;
+        clearTimeout(arrivalDoorTimer); arrivalDoorTimer = null;
+        stopAudio(audio.moveStart); stopAudio(audio.move); stopAudio(audio.moveStop);
+        brakePlayedThisTrip = false;
+        motionAudioPhase = 'start';
+        if (!soundOn) { motionAudioPhase = 'cruise'; return; }
+        safePlay(audio.moveStart);
+        // Fallback in case the browser does not emit `ended` for any reason.
+        motionStartTimer = setTimeout(startCruiseAudio, 3300);
+      }
+
+      function beginBrakeAudio() {
+        if (brakePlayedThisTrip) return;
+        brakePlayedThisTrip = true;
+        clearTimeout(motionStartTimer); motionStartTimer = null;
+        stopAudio(audio.moveStart);
+        stopAudio(audio.move);
+        motionAudioPhase = 'brake';
+        if (soundOn) {
+          // Arrival chime ("beep-beep") plays together with the braking sound.
+          safePlay(audio.arrival);
+          safePlay(audio.moveStop);
+        } else motionAudioPhase = 'postbrake';
+      }
+
+      function stopMotionAudio(resetTrip = false) {
+        clearTimeout(motionStartTimer); motionStartTimer = null;
+        clearTimeout(arrivalDoorTimer); arrivalDoorTimer = null;
+        stopAudio(audio.moveStart); stopAudio(audio.move); stopAudio(audio.moveStop);
+        motionAudioPhase = 'idle';
+        if (resetTrip) brakePlayedThisTrip = false;
+      }
+
+      audio.moveStart.addEventListener('ended', () => {
+        clearTimeout(motionStartTimer); motionStartTimer = null;
+        startCruiseAudio();
+      });
+      audio.moveStop.addEventListener('ended', () => {
+        if (motionAudioPhase === 'brake') motionAudioPhase = 'postbrake';
+      });
+
+      function scheduleDoorsAfterMotionStop() {
+        if (!(els.autoDoor.checked || lift.evacuateOnOpen || autoMode)) return;
+        clearTimeout(arrivalDoorTimer); arrivalDoorTimer = null;
+        let delay = 180;
+        if (soundOn && motionAudioPhase === 'brake' && !audio.moveStop.ended) {
+          const d = Number.isFinite(audio.moveStop.duration) && audio.moveStop.duration > 0
+            ? Math.max(0, audio.moveStop.duration - audio.moveStop.currentTime) * 1000
+            : 3550;
+          delay = d + 120;
+        }
+        arrivalDoorTimer = setTimeout(() => {
+          arrivalDoorTimer = null;
+          if (!lift.moving && lift.door === 'closed') openDoors(lift);
+        }, delay);
+      }
+      let mode = 'shift';
+      let startedAt = 0;
+      let clockInterval = null;
+      let score = 0;
+      let served = 0;
+      let penalties = 0;
+      let warnings = 0;
+      let warningResetTimer = null;
+      let warningFlashFull = false;
+      let shiftEnded = false;
+      let mission = null;
+      let callQueue = [];
+      let idleCallInterval = null;
+      let idleCallSeconds = 0;
+      let queueTick = null;
+      let lastFrame = performance.now();
+      let autoMode = false;
+      let autoFreeTimer = null;
+      let autoActionTimer = null;
+      let passengerWaitLimit = Infinity;
+      let cabinPassengers = [];
+      let thoughtStageKey = '';
+      let thoughtIndex = 0;
+      let nextThoughtAt = 0;
+      let autoThoughtText = 'Автоматика отключена. Управление выполняется вручную.';
+      let autoEventText = 'Последнее событие: —';
+      let autoMistakeTimer = null;
+      // Запоминает ручную команду этажа, которая была дана при выключенном АВТО.
+      // Если АВТО включить уже с пассажиром в кабине, старая ручная команда может
+      // остаться текущей целью. Тогда на неправильном этаже автоматика сама
+      // объяснит, что произошло, вместо молчаливой ошибки.
+      let manualShiftFloor = null;
+      let manualShiftMissionId = null;
+      let autoHandoverError = { active:false, floor:null, passengerId:null };
+      let alarmGrace = { active:false, deadline:0, timeout:null, ticker:null };
+      let floorWindowCenter = 50;
+      let lastFloorWindowRefresh = 0;
+      const FLOOR_WINDOW_SIZE = 160;
+      const floorButtonMap = new Map();
+
+      let jamState = { active:false, deadline:0, timeout:null, ticker:null, missionId:null };
+      const failureKinds = [
+        { name:'Привод EcoDisc', detail:'Нестабильная работа тягового привода' },
+        { name:'Датчик дверей', detail:'Неверный сигнал о положении дверей' },
+        { name:'Тормозная система', detail:'Сбой контроля тормоза' },
+        { name:'Контроллер', detail:'Ошибка модуля управления' },
+        { name:'Датчик этажа', detail:'Потеря коррекции позиции' },
+        { name:'Питание', detail:'Нестабильное питание силового модуля' }
+      ];
+      const repairPartCatalog = [
+        { id:'drive', icon:'⚙️', name:'Тяговый модуль' },
+        { id:'brake', icon:'🛑', name:'Тормозной узел' },
+        { id:'controller', icon:'🧠', name:'Контроллер' },
+        { id:'sensor', icon:'📡', name:'Датчики' },
+        { id:'door', icon:'🚪', name:'Привод дверей' },
+        { id:'power', icon:'⚡', name:'Силовой модуль' }
+      ];
+      let failureState = { active:false, kind:null, broken:new Set(), fixed:new Set() };
+
+      const els = {
+        menu: $('#menu'), game: $('#game'), floorPanel: $('#floorPanel'),
+        modeText: $('#modeText'), scoreText: $('#scoreText'), servedText: $('#servedText'), penaltyText: $('#penaltyText'), clockText: $('#clockText'),
+        callQueueText: $('#callQueueText'), warningDots: $('#warningDots'),
+        missionCard: $('#missionCard'), missionTitle: $('#missionTitle'), missionDetail: $('#missionDetail'), missionTimer: $('#missionTimer'),
+        activeLift: $('#activeLiftReadout'), activeFloor: $('#activeFloorReadout'), activeSpeed: $('#activeSpeedReadout'),
+        floorSearch: $('#floorSearch'), autoDoor: $('#autoDoor'), autoMode: $('#autoMode'), waitTimerSelect: $('#waitTimerSelect'), toasts: $('#toasts'), passengerRating: $('#passengerRating'),
+        alarmBtn: $('#alarmBtn'), alarmLabel: $('#alarmLabel'), alarmHint: $('#alarmHint'),
+        endOverlay: $('#endOverlay'), endSummary: $('#endSummary'), endReason: $('#endReason'),
+        freeServiceAction: $('#freeServiceAction'), freeSystemStatus: $('#freeSystemStatus'), breakLiftBtn: $('#breakLiftBtn'), repairBtn: $('#repairBtn'),
+        newCallBtn: $('#newCallBtn'), passengerThought: $('#passengerThought'), talkStatus: $('#talkStatus'), talkPersonTitle: $('#talkPersonTitle'), talkMode: $('#talkMode'), cctvFeed: $('#cctvFeed'), cctvPassenger: $('#cctvPassenger'), cctvFloor: $('#cctvFloor'), autoThought: $('#autoThought'), autoEvent: $('#autoEvent'), autoThoughtState: $('#autoThoughtState'), floorWindowNote: $('#floorWindowNote'),
+        repairOverlay: $('#repairOverlay'), repairGrid: $('#repairGrid'), repairFaultName: $('#repairFaultName'), repairHint: $('#repairHint'), repairReturn: $('#repairReturn')
+      };
+
+      function speedLimitForDistance(distanceFloors) {
+        // До отметки 1001 этажа сохраняем обычный профиль и максимум 40 м/с.
+        if (distanceFloors <= 2) return 1.6;
+        if (distanceFloors <= 5) return 2.2;
+        if (distanceFloors <= 10) return 3.0;
+        if (distanceFloors <= 25) return 4.5;
+        if (distanceFloors <= 50) return 6.5;
+        if (distanceFloors <= 100) return 10.0;
+        if (distanceFloors <= 200) return 14.0;
+        if (distanceFloors <= 350) return 18.0;
+        if (distanceFloors <= 550) return 22.0;
+        if (distanceFloors <= 800) return 30.0;
+        return 40.0;
+      }
+
+      function configureTripSpeed() {
+        const highZone = Math.max(Number(lift.floor) || 0, Number(lift.target) || 0) >= ULTRA_FLOOR_THRESHOLD;
+        if (highZone) {
+          const displaySpeed = autoMode ? ULTRA_AUTO_MPS : ULTRA_MANUAL_MPS;
+          lift.cruiseSpeed = displaySpeed;
+          lift.ultraTravel = {
+            startFloor: lift.floor,
+            targetFloor: lift.target,
+            elapsed: 0,
+            duration: ULTRA_TRAVEL_SECONDS,
+            displaySpeed
+          };
+        } else {
+          lift.ultraTravel = null;
+          lift.cruiseSpeed = speedLimitForDistance(Math.abs(lift.target - lift.floor));
+        }
+      }
+
+      function waitingPassengerCount() {
+        return mission && ['waiting','boarding','jammed','riding','evacuating'].includes(mission.stage) ? 1 : 0;
+      }
+
+      function autoRushActive() {
+        // При одном активном пассажире используется обычный профиль скорости.
+        return false;
+      }
+
+      function syncLiftPassengerFlag() {
+        lift.passenger = cabinPassengers.length > 0;
+      }
+
+      function addPassengerToCabin(call) {
+        if (!call || cabinPassengers.some(p => p.id === call.id)) return;
+        cabinPassengers.push(call);
+        call.stage = 'onboard';
+        syncLiftPassengerFlag();
+      }
+
+      function removePassengerFromCabin(id) {
+        cabinPassengers = cabinPassengers.filter(p => p.id !== id);
+        syncLiftPassengerFlag();
+      }
+
+      function startNextCabinDelivery() {
+        if (shiftEnded || mode !== 'shift' || mission || !cabinPassengers.length) return false;
+        mission = cabinPassengers[0];
+        mission.stage = 'riding';
+        mission.lift = 'B';
+        updateMissionUI(); updatePassengerRating(); updateUI(true);
+        if (autoMode) maybeRunAuto(180);
+        return true;
+      }
+
+      function passengerStars() {
+        if (!mission || typeof mission.stars !== 'number') return 5;
+        return clamp(Math.round(mission.stars), 0, 5);
+      }
+
+      function setPassengerStars(value, reason = '') {
+        if (!mission) return;
+        mission.stars = clamp(Math.round(value), 0, 5);
+        if (reason) toast('Оценка пассажира', `${reason}. Осталось звёзд: ${mission.stars}/5`);
+        updatePassengerRating();
+      }
+
+      function losePassengerStars(amount, reason = '') {
+        if (!mission) return 0;
+        setPassengerStars(passengerStars() - Math.max(0, amount), reason);
+        return passengerStars();
+      }
+
+      function updatePassengerRating() {
+        if (!els.passengerRating) return;
+        const activePassenger = mode === 'shift' && mission && (mission.stage === 'boarding' || mission.stage === 'jammed' || ((mission.stage === 'riding' || mission.stage === 'evacuating') && lift.passenger && lift.door === 'open'));
+        els.passengerRating.hidden = !activePassenger;
+        if (!activePassenger) { els.passengerRating.innerHTML = ''; return; }
+        const stars = passengerStars();
+        els.passengerRating.innerHTML = Array.from({length:5}, (_,idx) => `<span class="star ${idx < stars ? '' : 'empty'}">★</span>`).join('');
+        els.passengerRating.setAttribute('aria-label', `Оценка пассажира: ${stars} из 5`);
+      }
+
+      function thoughtOptions() {
+        if (mode !== 'shift') return ['Свободный режим. Камера продолжает наблюдение за кабиной.'];
+        if (!mission) return [idleCallInterval ? `Пока никого нет. Следующий вызов примерно через ${Math.max(0,idleCallSeconds)} секунд.` : 'Пока никого нет.'];
+        if (mission.stage === 'waiting') return [
+          'Надеюсь, лифт скоро приедет.',
+          'Проверю телефон, пока жду.',
+          `Мне нужно на этаж ${mission.to}.`,
+          'Интересно, долго ещё ждать?'
+        ];
+        if (mission.stage === 'boarding') return ['Двери открылись — захожу.', 'Наконец-то приехал.', `Так, мне на этаж ${mission.to}.`];
+        if (mission.stage === 'jammed') return ['Ай! Двери!', 'Откройте двери!', 'Так не должно быть!'];
+        if (mission.stage === 'riding') return [
+          `Еду на этаж ${mission.to}.`,
+          'Да, я уже в лифте. Скоро буду.',
+          'Надеюсь, доедем без остановок.',
+          `Сейчас проезжаем этаж ${lift.displayFloor}.`
+        ];
+        if (mission.stage === 'evacuating') return ['Что за сигнализация? Я выхожу.', 'Нет, я дальше не поеду.'];
+        if (mission.stage === 'aborted') return ['Я ухожу. Поездка закончена.'];
+        return ['Поездка завершена.'];
+      }
+
+      function updatePassengerThought(force = false) {
+        if (!els.passengerThought) return;
+        const stageKey = `${mode}|${mission ? mission.id + ':' + mission.stage : 'none'}|${alarmOn ? 'alarm' : 'quiet'}`;
+        const now = Date.now();
+        if (force || stageKey !== thoughtStageKey) {
+          thoughtStageKey = stageKey; thoughtIndex = 0; nextThoughtAt = now + 3200;
+        } else if (now >= nextThoughtAt) {
+          thoughtIndex += 1; nextThoughtAt = now + 3200 + Math.floor(Math.random()*2200);
+        }
+        const options = thoughtOptions();
+        const text = alarmOn && mission ? 'Что за сигнализация?! Я хочу выйти!' : options[thoughtIndex % options.length];
+        els.passengerThought.textContent = text;
+        els.talkStatus.textContent = !mission ? 'ожидание' : mission.stage === 'riding' ? 'в поездке' : mission.stage === 'waiting' ? 'ждёт лифт' : mission.stage === 'boarding' ? 'заходит' : mission.stage === 'jammed' ? 'опасность' : mission.stage === 'evacuating' ? 'выходит' : 'пассажир';
+        els.talkPersonTitle.textContent = mission ? `Пассажир · ${mission.from} → ${mission.to}` : 'Нет активного пассажира';
+        els.talkMode.textContent = mission && mission.stage === 'riding' ? (thoughtIndex % 3 === 1 ? '📱 говорит по телефону' : '💭 думает про себя') : '💭 мысли пассажира';
+      }
+
+      function updateCCTV() {
+        if (!els.cctvFeed) return;
+        els.cctvFeed.classList.toggle('open', lift.door === 'open' || lift.door === 'opening');
+        els.cctvFeed.classList.toggle('jammed', lift.door === 'jammed' || jamState.active);
+        if (els.cctvFloor) els.cctvFloor.textContent = formatFloor(lift.displayFloor);
+        if (els.cctvPassenger) {
+          const visible = cabinPassengers.length > 0 || (mission && (mission.stage === 'boarding' || mission.stage === 'jammed'));
+          els.cctvPassenger.classList.toggle('visible', Boolean(visible));
+          els.cctvPassenger.textContent = cabinPassengers.length > 1 ? `🧍×${cabinPassengers.length}` : '🧍';
+        }
+      }
+
+      function setAutoThought(text, eventText = null) {
+        if (text) autoThoughtText = text;
+        if (eventText) autoEventText = `Последнее событие: ${eventText}`;
+        updateAutoThoughtUI();
+      }
+
+      function updateAutoThoughtUI() {
+        if (!els.autoThought) return;
+        els.autoThoughtState.textContent = autoMode ? 'ВКЛ' : 'ВЫКЛ';
+        els.autoThoughtState.classList.toggle('on', autoMode);
+        els.autoThought.textContent = autoMode ? autoThoughtText : 'Автоматика отключена. Управление выполняется вручную.';
+        els.autoEvent.textContent = autoEventText;
+      }
+
+      function clearAlarmGrace() {
+        clearTimeout(alarmGrace.timeout);
+        clearInterval(alarmGrace.ticker);
+        alarmGrace = { active:false, deadline:0, timeout:null, ticker:null };
+      }
+
+      function startAlarmGrace() {
+        clearAlarmGrace();
+        if (mode !== 'shift' || shiftEnded || !lift.passenger || lift.evacuateOnOpen) return;
+        alarmGrace = { active:true, deadline:Date.now()+10000, timeout:null, ticker:null };
+        alarmGrace.timeout = setTimeout(() => {
+          alarmGrace.timeout = null;
+          if (!alarmGrace.active || !alarmOn) return;
+          clearAlarmGrace();
+          reactPassengerToAlarm();
+        }, 10000);
+        alarmGrace.ticker = setInterval(() => { if (alarmGrace.active) updateMissionUI(); }, 150);
+        toast('Пассажир ждёт', 'Сигнализация должна звучать 10 секунд подряд, прежде чем пассажир решит выйти.');
+        if (autoMode) {
+          setAutoThought('Сигнализация включена. Отключаю её до того, как пассажир потеряет доверие.', `защитный таймер 10 с · этаж ${Math.round(lift.floor)}`);
+          setTimeout(() => { if (autoMode && alarmOn && alarmGrace.active) setAlarm(false); }, 900);
+        }
+      }
+
+      function maybeAutoBoardingMistake() {
+        clearTimeout(autoMistakeTimer); autoMistakeTimer = null;
+        if (!autoMode || mode !== 'shift' || !mission || mission.stage !== 'boarding') return;
+        // Редкая ошибка автоматики: примерно одна на двенадцать посадок.
+        if (Math.random() >= 0.08) return;
+        autoMistakeTimer = setTimeout(() => {
+          autoMistakeTimer = null;
+          if (!autoMode || !mission || mission.stage !== 'boarding' || lift.door !== 'open') return;
+          setAutoThought('Ошибка: двери начали закрываться во время посадки. Включаю сигнализацию и немедленно освобождаю пассажира.', `ошибка дверей · этаж ${Math.round(lift.floor)}`);
+          jamPassengerInDoors();
+        }, 720 + Math.floor(Math.random()*420));
+      }
+
+      function clearAutoTimers() {
+        clearTimeout(autoFreeTimer); autoFreeTimer = null;
+        clearTimeout(autoActionTimer); autoActionTimer = null;
+        clearTimeout(autoMistakeTimer); autoMistakeTimer = null;
+      }
+
+      function enqueueAutoFloor(floor, priority = false) {
+        if (!Number.isFinite(floor) || floor < MIN_FLOOR || floor > MAX_FLOOR) return;
+        floor = Math.round(floor);
+        if (Math.round(lift.floor) === floor && !lift.moving) {
+          if (lift.door === 'closed') openDoors(lift, true);
+          return;
+        }
+        if (lift.target === floor || lift.queue.includes(floor)) return;
+        if (priority) lift.queue.unshift(floor); else lift.queue.push(floor);
+        panelDirty = true;
+        if (!lift.moving && lift.door === 'closed') startNext();
+        else if (!lift.moving && lift.door === 'open') scheduleAutoClose(900);
+        updateUI(true);
+      }
+
+      function scheduleFreeAutoTrip(delay = 1600) {
+        clearTimeout(autoFreeTimer); autoFreeTimer = null;
+        if (!autoMode || mode !== 'free' || shiftEnded || failureState.active) return;
+        if (lift.moving || lift.target != null || lift.queue.length || lift.door !== 'closed') return;
+        autoFreeTimer = setTimeout(() => {
+          autoFreeTimer = null;
+          if (!autoMode || mode !== 'free' || shiftEnded || failureState.active || lift.moving || lift.door !== 'closed') return;
+          const target = randFloor([Math.round(lift.floor)]);
+          enqueueAutoFloor(target, true);
+          setAutoThought(`Свободный маршрут: еду на этаж ${target}.`, `выбран этаж ${target}`);
+          toast('АВТО', `Лифт сам выбрал этаж ${target}`);
+        }, delay);
+      }
+
+      function runAutoShift() {
+        clearTimeout(autoActionTimer); autoActionTimer = null;
+        if (!autoMode || mode !== 'shift' || shiftEnded || failureState.active || jamState.active) return;
+        if (!mission) return;
+        const current = Math.round(lift.floor);
+        if (mission.stage === 'waiting') {
+          if (!lift.moving && current === mission.from) {
+            if (lift.door === 'closed') { setAutoThought('Я на этаже вызова. Открываю двери для пассажира.', `прибытие за пассажиром · этаж ${mission.from}`); openDoors(lift, true); }
+            else if (lift.door === 'open') { setAutoThought('Двери открыты. Жду, пока пассажир полностью войдёт.', `посадка · этаж ${mission.from}`); startPassengerBoarding(); }
+          } else if (!lift.moving || lift.target !== mission.from) {
+            setAutoThought(`Еду за пассажиром на этаж ${mission.from}.`, `вызов ${mission.from} → ${mission.to}`);
+            enqueueAutoFloor(mission.from, true);
+          }
+        } else if (mission.stage === 'riding') {
+          if (!lift.moving && current === mission.to) {
+            if (lift.door === 'closed') { setAutoThought(`Пассажир доставлен на этаж ${mission.to}. Открываю двери.`, `доставка · этаж ${mission.to}`); openDoors(lift, true); }
+          } else if (lift.target !== mission.to) {
+            setAutoThought(`Везу пассажира на этаж ${mission.to}.`, `маршрут ${Math.round(lift.floor)} → ${mission.to}`);
+            enqueueAutoFloor(mission.to, true);
+          }
+        }
+      }
+
+      function maybeRunAuto(delay = 120) {
+        clearTimeout(autoActionTimer); autoActionTimer = null;
+        if (!autoMode || shiftEnded) return;
+        if (mode === 'free') { scheduleFreeAutoTrip(Math.max(350, delay)); return; }
+        autoActionTimer = setTimeout(() => { autoActionTimer = null; runAutoShift(); }, delay);
+      }
+
+      function endShift(reason = 'Смена завершена.') {
+        if (shiftEnded) return;
+        shiftEnded = true;
+        clearInterval(queueTick); queueTick = null;
+        clearInterval(idleCallInterval); idleCallInterval = null;
+        clearTimeout(warningResetTimer); warningResetTimer = null;
+        clearInterval(clockInterval); clockInterval = null;
+        clearAutoTimers();
+        clearBoardingTimer(); clearJamState(); clearAlarmGrace();
+        setAlarm(false);
+        lift.moving = false; lift.direction = 0; lift.speed = 0; lift.target = null; lift.queue = []; lift.ultraTravel = null;
+        cabinPassengers = []; syncLiftPassengerFlag(); lift.pickupFor = null; lift.evacuateOnOpen = false;
+        clearTimeout(lift.doorTimer); lift.doorTimer = null;
+        stopMotionAudio(true);
+        els.modeText.textContent = 'Смена окончена';
+        els.endReason.textContent = reason;
+        els.endSummary.textContent = `Счёт: ${Math.round(score)} · Доставлено: ${served} · Предупреждения: ${warningFlashFull ? 3 : warnings} · Штрафы: ${penalties}`;
+        els.endOverlay.classList.add('visible');
+        panelDirty = true; updateUI(true); updateMissionUI();
+      }
+
+      function addPenalty(reason) {
+        if (mode !== 'shift' || shiftEnded) return;
+        penalties += 1;
+        toast('Штраф +1', `${reason}. Штрафов: ${penalties}/10`);
+        updateUI();
+        if (penalties >= 10) endShift('Получено 10 штрафов — достигнут максимальный лимит смены.');
+      }
+
+      function addWarning(reason) {
+        if (mode !== 'shift' || shiftEnded) return;
+        warnings += 1;
+        if (warnings >= 3) {
+          warnings = 0;
+          warningFlashFull = true;
+          toast('3 предупреждения', `${reason}. Начисляется штраф.`);
+          updateWarningsUI();
+          addPenalty('Накоплено 3 предупреждения');
+          clearTimeout(warningResetTimer);
+          warningResetTimer = setTimeout(() => {
+            warningFlashFull = false;
+            updateWarningsUI();
+          }, 850);
+        } else {
+          toast('Предупреждение', `${reason}. Предупреждения: ${warnings}/3`);
+          updateWarningsUI();
+        }
+      }
+
+      function updateWarningsUI() {
+        const dots = els.warningDots ? [...els.warningDots.querySelectorAll('.warning-dot')] : [];
+        const visibleWarnings = warningFlashFull ? 3 : warnings;
+        dots.forEach((d, idx) => d.classList.toggle('active', idx < visibleWarnings));
+      }
+
+      function evacuatePassenger() {
+        if (!lift.passenger || !lift.evacuateOnOpen) return;
+        const evacuated = cabinPassengers.length;
+        const activeId = mission && mission.stage === 'evacuating' ? mission.id : null;
+        cabinPassengers = []; syncLiftPassengerFlag(); lift.pickupFor = null; lift.evacuateOnOpen = false;
+        if (activeId && mission && mission.id === activeId) {
+          const oldId = mission.id;
+          mission.stage = 'aborted';
+          toast('Пассажиры вышли', `Из-за сигнализации кабину покинули пассажиры: ${Math.max(1, evacuated)}.`);
+          updateMissionUI();
+          setTimeout(() => {
+            if (!shiftEnded && mission && mission.id === oldId && mission.stage === 'aborted') {
+              mission = null;
+              activateNextMission();
+            }
+          }, 900);
+        } else {
+          toast('Пассажиры вышли', `Из-за сигнализации кабину покинули пассажиры: ${Math.max(1, evacuated)}.`);
+          updateUI(true);
+        }
+      }
+
+      function reactPassengerToAlarm() {
+        if (mode !== 'shift' || shiftEnded || !lift.passenger || lift.evacuateOnOpen) return;
+        for (const p of cabinPassengers) p.stars = 0;
+        if (mission && cabinPassengers.some(p => p.id === mission.id)) setPassengerStars(0, 'Сигнализация напугала пассажира — он полностью потерял доверие');
+        else toast('Оценка пассажиров', 'Сигнализация обнулила звёзды всех пассажиров в кабине.');
+        lift.evacuateOnOpen = true;
+        if (mission && mission.stage === 'riding' && mission.lift === 'B') mission.stage = 'evacuating';
+        addWarning('Пассажиры в лифте B услышали сигнализацию');
+        if (shiftEnded) return;
+        if (!lift.moving) {
+          if (lift.door === 'open') evacuatePassenger();
+          else if (lift.door === 'closed') openDoors(lift, true);
+        }
+        updateMissionUI();
+      }
+
+      function clearBoardingTimer() {
+        clearTimeout(lift.boardingTimer);
+        lift.boardingTimer = null;
+      }
+
+      function clearJamState() {
+        clearTimeout(jamState.timeout);
+        clearInterval(jamState.ticker);
+        jamState = { active:false, deadline:0, timeout:null, ticker:null, missionId:null };
+      }
+
+      function startPassengerBoarding() {
+        if (!mission || mission.stage !== 'waiting') return;
+        clearBoardingTimer();
+        mission.stage = 'boarding';
+        mission.lift = 'B';
+        toast('Пассажир заходит', 'Не закрывайте двери, пока пассажир не вошёл полностью.');
+        if (autoMode) setAutoThought('Контролирую посадку пассажира и датчик дверей.', `пассажир заходит · этаж ${mission.from}`);
+        updateMissionUI(); updateUI();
+        maybeAutoBoardingMistake();
+        lift.boardingTimer = setTimeout(() => {
+          lift.boardingTimer = null;
+          if (!mission || mission.stage !== 'boarding' || lift.door !== 'open') return;
+          const boarded = mission;
+          addPassengerToCabin(boarded);
+          lift.pickupFor = boarded.id;
+          score += Math.max(20, 130 - boarded.elapsed);
+          toast('Пассажир вошёл', autoMode ? `АВТО отвезёт пассажира на этаж ${boarded.to}.` : `Теперь отвезите его на этаж ${boarded.to}`);
+          if (autoMode) setAutoThought(`Пассажир в кабине. Следующая цель — этаж ${boarded.to}.`, `посадка завершена · ${boarded.from} → ${boarded.to}`);
+          if (autoMode) {
+            mission = null;
+            if (callQueue.length) activateNextMission();
+            else startNextCabinDelivery();
+          } else {
+            mission = boarded;
+            mission.stage = 'riding';
+          }
+          updateMissionUI(); updateUI(); updatePassengerRating();
+          if (autoMode) maybeRunAuto(180);
+        }, 2600);
+      }
+
+      function abortMissionAfterJam(reasonText) {
+        if (!mission) return;
+        const oldId = mission.id;
+        mission.stage = 'aborted';
+        mission.abortReason = reasonText;
+        if (mission) removePassengerFromCabin(mission.id);
+        lift.pickupFor = null;
+        updateMissionUI(); updateUI();
+        setTimeout(() => {
+          if (!shiftEnded && mission && mission.id === oldId && mission.stage === 'aborted') {
+            mission = null;
+            activateNextMission();
+          }
+        }, 1200);
+      }
+
+      function emergencyOpenJammedDoors(byAlarm, autoRescue = false) {
+        if (!jamState.active) return;
+        const missionId = jamState.missionId;
+        clearJamState();
+        const retryBoarding = Boolean(autoRescue && autoMode && mission && mission.id === missionId && passengerStars() > 0);
+        if (!byAlarm && !autoRescue) addWarning('Пассажира прижало дверями, а сигнализация не была нажата вовремя');
+        lift.door = 'opening';
+        safePlay(audio.open);
+        if (retryBoarding) {
+          toast('АВТО: пассажир освобождён', 'Двери немедленно открыты. Пассажир попробует зайти в кабину ещё раз.');
+        } else {
+          toast(byAlarm ? 'Экстренное освобождение' : 'Авторазблокировка дверей', byAlarm ? 'Сигнализация нажата вовремя. Двери экстренно открываются.' : 'Прошло 10 секунд. Двери открылись автоматически и начислено предупреждение.');
+          if (mission && mission.id === missionId) abortMissionAfterJam('Пассажир разозлился и ушёл после зажатия дверями.');
+        }
+        updateUI();
+        setTimeout(() => {
+          if (lift.door !== 'opening') return;
+          lift.door = 'open';
+          if (retryBoarding && mission && mission.id === missionId) {
+            mission.stage = 'waiting';
+            removePassengerFromCabin(mission.id);
+            lift.pickupFor = null;
+            updateMissionUI(); updatePassengerRating();
+            setTimeout(() => {
+              if (autoMode && mission && mission.id === missionId && mission.stage === 'waiting' && lift.door === 'open') startPassengerBoarding();
+            }, 420);
+          }
+          updateUI(true);
+          scheduleAutoClose(retryBoarding ? 6200 : 5200);
+        }, 1050);
+      }
+
+      function jamPassengerInDoors() {
+        if (mode !== 'shift' || shiftEnded || !mission || mission.stage !== 'boarding') return;
+        clearBoardingTimer();
+        clearTimeout(lift.doorTimer); lift.doorTimer = null;
+        mission.stage = 'jammed';
+        lift.door = 'jammed';
+        syncLiftPassengerFlag();
+        const remainingStars = losePassengerStars(1, 'Двери прижали пассажира');
+        jamState = { active:true, deadline:Date.now()+10000, timeout:null, ticker:null, missionId:mission.id };
+        jamState.timeout = setTimeout(() => emergencyOpenJammedDoors(false), 10000);
+        jamState.ticker = setInterval(() => { if (jamState.active) updateMissionUI(); }, 150);
+        safePlay(audio.close);
+        if (autoMode && remainingStars > 0) {
+          toast('⚠ Двери зажали пассажира', 'АВТО обнаружил препятствие, включит сигнализацию и немедленно откроет двери. Потеряна 1 звезда.');
+          setAutoThought('Датчик дверей видит препятствие. Включаю сигнализацию и экстренно открываю двери.', `защита пассажира · этаж ${Math.round(lift.floor)}`);
+          setTimeout(() => { if (jamState.active) setAlarm(true); }, 520);
+        } else if (remainingStars <= 0) {
+          addWarning('Пассажир потерял все звёзды после повторных зажатий дверями');
+          toast('Пассажир очень недоволен', 'Звёзд больше нет — двери сейчас откроются, и пассажир уйдёт.');
+          setTimeout(() => { if (jamState.active) emergencyOpenJammedDoors(false, true); }, 850);
+        } else {
+          toast('⚠ Двери зажали пассажира', 'Нажмите сигнализацию в течение 10 секунд. Иначе двери откроются автоматически и будет предупреждение.');
+        }
+        updateMissionUI(); updateUI(); updatePassengerRating();
+      }
+
+      function updateFreeFailureUI() {
+        if (!els.freeServiceAction) return;
+        const free = mode === 'free';
+        els.freeServiceAction.hidden = !free;
+        if (!free) return;
+        const active = failureState.active && failureState.kind;
+        els.freeSystemStatus.textContent = active ? `⚠ ${failureState.kind.name}` : 'Система исправна';
+        els.freeSystemStatus.classList.toggle('fault', Boolean(active));
+        els.breakLiftBtn.disabled = Boolean(active);
+        els.repairBtn.hidden = !active;
+      }
+
+      function triggerManualFailure() {
+        if (mode !== 'free' || failureState.active) return;
+        const kind = failureKinds[Math.floor(Math.random() * failureKinds.length)];
+        const shuffled = [...repairPartCatalog].sort(() => Math.random() - .5);
+        const brokenCount = 2 + Math.floor(Math.random() * 2);
+        failureState = { active:true, kind, broken:new Set(shuffled.slice(0, brokenCount).map(x => x.id)), fixed:new Set() };
+        if (lift.moving) {
+          lift.moving = false; lift.direction = 0; lift.speed = 0; stopMotionAudio(true);
+        }
+        clearTimeout(lift.doorTimer); lift.doorTimer = null;
+        updateFreeFailureUI(); updateLiftUI();
+        toast('Лифт сломан', `${kind.name}: ${kind.detail}. Теперь его нужно починить.`);
+      }
+
+      function renderRepairParts() {
+        els.repairGrid.innerHTML = '';
+        for (const part of repairPartCatalog) {
+          const broken = failureState.broken.has(part.id);
+          const btn = document.createElement('button');
+          btn.type = 'button'; btn.className = `repair-part ${broken ? 'broken' : 'fixed'}`; btn.dataset.part = part.id;
+          btn.innerHTML = `<span class="part-icon">${part.icon}</span><b>${part.name}</b><small>${broken ? 'Неисправно — нажмите' : 'Исправно'}</small>`;
+          if (broken) btn.addEventListener('click', () => replaceRepairPart(btn, part));
+          els.repairGrid.appendChild(btn);
+        }
+      }
+
+      function openRepairStation() {
+        if (mode !== 'free' || !failureState.active || !failureState.kind) return;
+        els.repairFaultName.textContent = `${failureState.kind.name}: ${failureState.kind.detail}`;
+        els.repairHint.textContent = 'Красные узлы неисправны. Нажимайте на них по одному, чтобы заменить.';
+        els.repairReturn.disabled = true; els.repairReturn.textContent = 'Ремонт не завершён';
+        renderRepairParts(); els.repairOverlay.classList.add('visible');
+      }
+
+      function replaceRepairPart(button, part) {
+        if (!failureState.active || !failureState.broken.has(part.id) || failureState.fixed.has(part.id)) return;
+        failureState.fixed.add(part.id); button.disabled = true; button.classList.add('replacing');
+        button.querySelector('small').textContent = 'Замена...';
+        setTimeout(() => {
+          button.classList.remove('broken','replacing'); button.classList.add('fixed'); button.querySelector('small').textContent = 'Заменено';
+          if ([...failureState.broken].every(id => failureState.fixed.has(id))) {
+            els.repairHint.textContent = 'Все повреждённые узлы заменены. Можно вернуться в лифт.';
+            els.repairReturn.disabled = false; els.repairReturn.textContent = 'Вернуться в лифт';
+          }
+        }, 700);
+      }
+
+      function finishRepair() {
+        if (mode !== 'free' || !failureState.active || ![...failureState.broken].every(id => failureState.fixed.has(id))) return;
+        failureState = { active:false, kind:null, broken:new Set(), fixed:new Set() };
+        els.repairOverlay.classList.remove('visible'); updateFreeFailureUI();
+        toast('Ремонт завершён', 'Лифт снова исправен.');
+        if (lift.target != null && lift.door === 'closed') {
+          lift.direction = lift.target > lift.floor ? 1 : -1; lift.lastDirection = lift.direction;
+          configureTripSpeed();
+          lift.moving = true; lift.speed = lift.ultraTravel ? lift.ultraTravel.displaySpeed : .35; beginMotionAudio();
+        } else if (lift.target == null && lift.door === 'closed') startNext();
+        else if (lift.door === 'open') scheduleAutoClose();
+        updateUI(true);
+        if (autoMode) maybeRunAuto(800);
+      }
+
+      function setAlarm(nextState) {
+        alarmOn = Boolean(nextState);
+        els.alarmBtn.classList.toggle('active', alarmOn);
+        els.alarmBtn.setAttribute('aria-pressed', String(alarmOn));
+        els.alarmLabel.textContent = alarmOn ? 'Остановить сигнал' : 'Сигнализация';
+        els.alarmHint.textContent = alarmOn ? 'Аварийный сигнал включён — нажмите ещё раз' : 'Нажмите, чтобы включить непрерывный сигнал';
+        if (alarmOn) {
+          if (!soundOn) { soundOn = true; $('#soundBtn').textContent = '🔊'; startMotor(); }
+          safePlay(audio.alarm, false);
+          if (jamState.active) {
+            // В АВТО сигнализация используется как мгновенная команда экстренного освобождения.
+            emergencyOpenJammedDoors(true, autoMode);
+            if (autoMode) setAutoThought('Пассажир освобождён. Отключаю сигнализацию и повторяю посадку.', `экстренное открытие · этаж ${Math.round(lift.floor)}`);
+            setTimeout(() => { if (alarmOn) setAlarm(false); }, autoMode ? 700 : 1400);
+          } else {
+            startAlarmGrace();
+          }
+          if (!shiftEnded) toast('Сигнализация', 'Непрерывный аварийный сигнал включён');
+        } else {
+          stopAudio(audio.alarm);
+          if (alarmGrace.active) {
+            clearAlarmGrace();
+            if (mode === 'shift' && lift.passenger && !lift.evacuateOnOpen) {
+              toast('Сигнализация отключена', 'Пассажир остался в кабине — 10 секунд не истекли.');
+              if (autoMode) setAutoThought('Сигнализация отключена вовремя. Продолжаю маршрут.', `защита завершена · этаж ${Math.round(lift.floor)}`);
+            }
+          }
+        }
+        updateMissionUI(); updateAutoThoughtUI();
+      }
+
+      function renderFloorWindow(center = lift.displayFloor) {
+        center = clamp(Math.round(center), MIN_FLOOR, MAX_FLOOR);
+        floorWindowCenter = center;
+        floorButtons = [];
+        floorButtonMap.clear();
+        els.floorPanel.innerHTML = '';
+        const half = Math.floor(FLOOR_WINDOW_SIZE / 2);
+        let high = Math.min(MAX_FLOOR, center + half);
+        let low = Math.max(MIN_FLOOR, high - FLOOR_WINDOW_SIZE + 1);
+        if (high - low + 1 < FLOOR_WINDOW_SIZE) high = Math.min(MAX_FLOOR, low + FLOOR_WINDOW_SIZE - 1);
+        const frag = document.createDocumentFragment();
+        for (let f = high; f >= low; f--) {
+          const b = document.createElement('button');
+          b.className = 'floor-btn'; b.dataset.floor = String(f); b.textContent = String(f); b.title = `Этаж ${f}`;
+          b.addEventListener('click', () => requestFloor(f));
+          floorButtons.push(b); floorButtonMap.set(f, b); frag.appendChild(b);
+        }
+        els.floorPanel.appendChild(frag);
+        if (els.floorWindowNote) els.floorWindowNote.textContent = `Показаны этажи ${low}…${high} · можно ввести любой до 1 000 000`;
+        panelDirty = true;
+      }
+
+      function buildFloorPanel() {
+        renderFloorWindow(lift.displayFloor);
+      }
+
+      function requestFloor(floor) {
+        if (shiftEnded) return;
+        if (failureState.active) { toast('Лифт неисправен', 'Сначала нажмите «Починить лифт».'); return; }
+        if (!Number.isFinite(floor) || floor < MIN_FLOOR || floor > MAX_FLOOR) return;
+        floor = Math.round(floor);
+        if (!floorButtonMap.has(floor)) renderFloorWindow(floor);
+        safePlay(audio.beep);
+        // В смене ручной выбор этажа при выключенном АВТО запоминается.
+        // Это нужно для реалистичного сценария передачи управления обратно АВТО:
+        // если старая ручная цель уже выполняется, АВТО не телепортирует лифт на
+        // правильный этаж, а распознаёт свою ошибку только после прибытия.
+        if (mode === 'shift' && !autoMode && mission && ['waiting','boarding','riding'].includes(mission.stage)) {
+          manualShiftFloor = floor;
+          manualShiftMissionId = mission.id;
+        }
+        if (Math.round(lift.floor) === floor && !lift.moving) {
+          toast('Лифт B', `Уже находится на этаже ${floor}`);
+          openDoors(lift, true); return;
+        }
+        if (!lift.queue.includes(floor) && lift.target !== floor) {
+          lift.queue.push(floor); toast('Лифт B', `Этаж ${floor} добавлен в очередь`);
+        }
+        panelDirty = true;
+        if (!lift.moving && lift.door === 'closed') startNext();
+        else if (!lift.moving && lift.door === 'open') closeDoors(lift, true);
+        updateUI(true);
+      }
+
+      function startNext() {
+        if (failureState.active) return;
+        if (lift.moving || lift.door !== 'closed' || lift.target != null || !lift.queue.length) return;
+        lift.target = lift.queue.shift();
+        lift.direction = lift.target > lift.floor ? 1 : -1; lift.lastDirection = lift.direction;
+        configureTripSpeed();
+        lift.moving = true; lift.speed = lift.ultraTravel ? lift.ultraTravel.displaySpeed : .35;
+        announceDirection(lift.direction);
+        beginMotionAudio(); panelDirty = true; updateUI(true);
+      }
+
+      function scheduleAutoClose(delay = 4200) {
+        clearTimeout(lift.doorTimer); lift.doorTimer = null;
+        const automaticClosing = els.autoDoor.checked || autoMode;
+        if (!automaticClosing || lift.door !== 'open') return;
+        lift.doorTimer = setTimeout(() => {
+          lift.doorTimer = null;
+          if ((els.autoDoor.checked || autoMode) && lift.door === 'open') closeDoors(lift);
+        }, delay);
+      }
+
+      function openDoors(_lift, manual = false) {
+        if (failureState.active) { toast('Лифт неисправен', 'Сначала почините лифт.'); return; }
+        if (jamState.active || lift.door === 'jammed') {
+          toast('Двери заблокированы', 'Пассажир зажат. Для экстренного открытия нажмите сигнализацию.');
+          return;
+        }
+        if (lift.moving || ['open','opening','announcing'].includes(lift.door)) {
+          if (lift.door === 'open') scheduleAutoClose();
+          return;
+        }
+        clearTimeout(lift.doorTimer); lift.doorTimer = null;
+        lift.door = 'announcing'; updateUI();
+        // The new generated male voice says only the floor. Door wording itself
+        // comes from the original prerecorded opening file used in the earlier build.
+        announceFloor(Math.round(lift.floor), () => {
+          if (lift.door !== 'announcing') return;
+          playOriginalDoorOpeningAnnouncement();
+          setTimeout(() => {
+            if (lift.door !== 'announcing') return;
+            lift.door = 'opening'; safePlay(audio.open); updateUI();
+            setTimeout(() => {
+              if (lift.door !== 'opening') return;
+              lift.door = 'open'; onDoorsOpened(); updateUI(true); scheduleAutoClose();
+            }, 2050);
+          }, 650);
+        });
+      }
+
+      function closeDoors() {
+        if (failureState.active) { toast('Лифт неисправен', 'Сначала почините лифт.'); return; }
+        if (jamState.active || lift.door === 'jammed') {
+          toast('Двери заблокированы', 'Пассажир зажат. Нажмите сигнализацию.');
+          return;
+        }
+        if (lift.moving || ['closed','closing','announcing'].includes(lift.door)) return;
+        if (mode === 'shift' && mission && mission.stage === 'boarding' && Math.round(lift.floor) === mission.from) {
+          jamPassengerInDoors();
+          return;
+        }
+        clearTimeout(lift.doorTimer); lift.doorTimer = null;
+        // Closing uses only the original prerecorded/mechanical door file.
+        // The generated male voice is reserved for floor and travel direction.
+        lift.door = 'closing'; safePlay(audio.close); updateUI();
+        setTimeout(() => {
+          if (lift.door !== 'closing') return;
+          lift.door = 'closed'; updateUI(); startNext();
+          if (autoMode) maybeRunAuto(350);
+        }, 2200);
+      }
+
+      function boardQueuedPassengersAtFloor(floor) {
+        if (mode !== 'shift' || !callQueue.length) return 0;
+        const boarding = callQueue.filter(call => call.from === floor);
+        if (!boarding.length) return 0;
+        callQueue = callQueue.filter(call => call.from !== floor);
+        for (const call of boarding) {
+          call.elapsed = 0;
+          addPassengerToCabin(call);
+        }
+        toast('Групповая посадка', `${boarding.length} пассажир(а/ов) вошли на этаже ${floor}. В кабине: ${cabinPassengers.length}`);
+        panelDirty = true; updateUI(true); updateMissionUI();
+        return boarding.length;
+      }
+
+      function onDoorsOpened() {
+        if (lift.evacuateOnOpen && lift.passenger) { evacuatePassenger(); return; }
+        if (!mission) { if (autoMode) maybeRunAuto(900); return; }
+        const current = Math.round(lift.floor);
+        if (mission.stage === 'waiting' && current === mission.from) {
+          startPassengerBoarding();
+        } else if (mission.stage === 'riding' && current === mission.to) {
+          const delivered = mission;
+          delivered.stage = 'done';
+          removePassengerFromCabin(delivered.id);
+          lift.pickupFor = null; served++;
+          score += Math.max(100, 420 - delivered.elapsed * 2);
+          toast('Маршрут выполнен', `Пассажир доставлен на этаж ${delivered.to} с рейтингом ${clamp(Math.round(delivered.stars ?? 5),0,5)}/5 ★. В кабине: ${cabinPassengers.length}`);
+          mission = null;
+          manualShiftFloor = null; manualShiftMissionId = null; autoHandoverError = { active:false, floor:null, passengerId:null };
+          updateMissionUI(); updatePassengerRating(); updateUI(true);
+          setTimeout(() => {
+            if (shiftEnded || mission) return;
+            // Сначала забираем оставшихся ожидающих людей, затем развозим
+            // уже находящихся в кабине пассажиров по порядку посадки.
+            if (!startNextCabinDelivery()) activateNextMission();
+          }, 700);
+        } else if (mode === 'shift' && mission.stage === 'riding' && cabinPassengers.some(p => p.id === mission.id) && current !== mission.to) {
+          // Особый сценарий: пользователь выключил АВТО, дал ручную команду,
+          // забрал пассажира и снова включил АВТО. Если лифт доехал по старой
+          // ручной команде не туда, автоматика сама сообщает, что «опередила
+          // саму себя» и ошибочно приняла старый этаж за актуальную цель.
+          if (autoMode && autoHandoverError.active && autoHandoverError.passengerId === mission.id && current === autoHandoverError.floor) {
+            const neededFloor = mission.to;
+            setAutoThought(
+              `⚠ АВТО опередил сам себя: старая ручная команда привела лифт на этаж ${current}, хотя пассажиру нужен этаж ${neededFloor}.`,
+              `ошибка АВТО · приехал ${current}, нужен ${neededFloor}`
+            );
+            toast('⚠ Ошибка АВТО', `АВТО опередил сам себя и ошибочно привёз пассажира на этаж ${current} вместо ${neededFloor}.`);
+            autoHandoverError = { active:false, floor:null, passengerId:null };
+          }
+          setPassengerStars(0);
+          const wrongId = mission.id;
+          removePassengerFromCabin(wrongId); lift.pickupFor = null;
+          addWarning(`Пассажира высадили на неправильном этаже ${current} вместо ${mission.to}`);
+          mission.stage = 'aborted';
+          mission.abortReason = `Пассажир вышел на неправильном этаже ${current} и отказался продолжать поездку.`;
+          toast('Неправильный этаж', `Нужен был этаж ${mission.to}. Пассажир ушёл, начислено предупреждение.`);
+          const oldId = mission.id;
+          manualShiftFloor = null; manualShiftMissionId = null;
+          updatePassengerRating(); updateMissionUI();
+          setTimeout(() => {
+            if (!shiftEnded && mission && mission.id === oldId && mission.stage === 'aborted') {
+              mission = null;
+              if (!startNextCabinDelivery()) activateNextMission();
+            }
+          }, 900);
+        }
+      }
+
+      function arrive() {
+        lift.floor = lift.target; lift.displayFloor = lift.target; lift.target = null;
+        lift.moving = false; lift.direction = 0; lift.speed = 0; lift.cruiseSpeed = 0; lift.ultraTravel = null;
+        // The braking sound and arrival chime are already started together during deceleration.
+        stopAudio(audio.moveStart);
+        stopAudio(audio.move);
+        if (!brakePlayedThisTrip) beginBrakeAudio();
+        panelDirty = true; updateUI(true);
+        // Doors start only after ecostop.wav has finished (unless auto doors are disabled).
+        scheduleDoorsAfterMotionStop();
+      }
+
+      function updateLiftPhysics(dt) {
+        if (failureState.active) return;
+        if (!lift.moving || lift.target == null) return;
+
+        // Floors 1001+ use the requested arcade ultra-speed. The displayed speed is
+        // enormous, while the visual trip is stretched to a few seconds so the floor
+        // counter, travel sound and braking sequence remain visible instead of teleporting.
+        if (lift.ultraTravel) {
+          const u = lift.ultraTravel;
+          u.elapsed += Math.max(0, dt);
+          const p = clamp(u.elapsed / u.duration, 0, 1);
+          const direction = Math.sign(u.targetFloor - u.startFloor) || lift.lastDirection || 1;
+          // Smooth movement on the floor counter.
+          const eased = p * p * (3 - 2 * p);
+          lift.floor = u.startFloor + (u.targetFloor - u.startFloor) * eased;
+          lift.displayFloor = clamp(Math.round(lift.floor), MIN_FLOOR, MAX_FLOOR);
+          lift.direction = direction; lift.lastDirection = direction;
+          lift.speed = u.displaySpeed;
+          if (p >= 0.68) beginBrakeAudio();
+          if (p >= 1) arrive();
+          return;
+        }
+
+        const distanceFloors = Math.abs(lift.target - lift.floor);
+        const direction = Math.sign(lift.target - lift.floor);
+        const remainingM = distanceFloors * FLOOR_HEIGHT_M;
+        const longTripScale = distanceFloors > 250000 ? 900 : distanceFloors > 50000 ? 300 : distanceFloors > 10000 ? 90 : distanceFloors > 2500 ? 30 : SIM_TIME_SCALE;
+        const simDt = dt * longTripScale;
+        const brakingDistance = Math.max(7, (lift.speed * lift.speed) / (2 * 1.55) + 5);
+        const effectiveCruiseSpeed = autoRushActive() ? 40 : lift.cruiseSpeed;
+        let desired = effectiveCruiseSpeed;
+        if (remainingM < brakingDistance) {
+          beginBrakeAudio();
+          desired = Math.max(.55, effectiveCruiseSpeed * (remainingM / brakingDistance));
+        }
+        const accel = desired > lift.speed ? 1.65 : 2.2;
+        const step = accel * simDt;
+        if (lift.speed < desired) lift.speed = Math.min(desired, lift.speed + step);
+        else lift.speed = Math.max(desired, lift.speed - step);
+        lift.speed = clamp(lift.speed, .28, 40);
+        const floorDelta = (lift.speed / FLOOR_HEIGHT_M) * simDt;
+        lift.floor += direction * floorDelta;
+        lift.displayFloor = clamp(Math.round(lift.floor), MIN_FLOOR, MAX_FLOOR);
+        lift.direction = direction; lift.lastDirection = direction;
+        if ((direction > 0 && lift.floor >= lift.target) || (direction < 0 && lift.floor <= lift.target)) arrive();
+      }
+
+      function makePassengerCall(source = 'auto') {
+        const from = randFloor();
+        const to = randFloor([from]);
+        return { id:Date.now() + Math.floor(Math.random()*100000), from, to, stage:'waiting', lift:null, elapsed:0, source, stars:5 };
+      }
+
+      function stopIdleCallTimer() {
+        clearInterval(idleCallInterval); idleCallInterval = null; idleCallSeconds = 0;
+      }
+
+      function scheduleIdleCall(delaySeconds = 20) {
+        if (mode !== 'shift' || shiftEnded || mission || callQueue.length || cabinPassengers.length || idleCallInterval) return;
+        idleCallSeconds = delaySeconds;
+        updateMissionUI();
+        idleCallInterval = setInterval(() => {
+          if (mode !== 'shift' || shiftEnded || mission || callQueue.length || cabinPassengers.length) { stopIdleCallTimer(); return; }
+          idleCallSeconds -= 1;
+          updateMissionUI();
+          if (idleCallSeconds <= 0) {
+            stopIdleCallTimer();
+            addPassengerCall('auto');
+          }
+        }, 1000);
+      }
+
+      function addPassengerCall(source = 'manual') {
+        if (mode !== 'shift' || shiftEnded) return false;
+        if (mission || cabinPassengers.length) {
+          toast('Вызов уже активен', 'Сначала завершите текущую поездку пассажира. Второй вызов добавить нельзя.');
+          updateUI();
+          return false;
+        }
+        stopIdleCallTimer();
+        const call = makePassengerCall(source);
+        mission = call;
+        callQueue = [];
+        toast('Новый вызов', `Пассажир ждёт на этаже ${call.from}`);
+        setAutoThought(autoMode ? `Получен вызов. Нужно забрать пассажира на этаже ${call.from}.` : autoThoughtText, `пассажир вызвал лифт: ${call.from} → ${call.to}`);
+        panelDirty = true; updateMissionUI(); updateUI(true);
+        if (autoMode) maybeRunAuto(180);
+        return true;
+      }
+
+      function activateNextMission() {
+        if (shiftEnded || mode !== 'shift' || mission) return;
+        callQueue = [];
+        if (cabinPassengers.length) {
+          startNextCabinDelivery();
+        } else {
+          scheduleIdleCall(20);
+          updateMissionUI(); updateUI();
+        }
+      }
+
+      function expireQueuedPassenger(call, isCurrent = false) {
+        addWarning(`Пассажир с этажа ${call.from} превысил выбранный лимит ожидания и ушёл`);
+        if (isCurrent) {
+          toast('Пассажир ушёл', `Вызов с этажа ${call.from} отменён из-за долгого ожидания`);
+        }
+      }
+
+      function tickPassengerCalls() {
+        if (mode !== 'shift' || shiftEnded) return;
+
+        // Лимит ожидания относится только к единственному активному вызову;
+        // при ∞ пассажир ждёт без ограничения времени.
+        if (mission && mission.stage === 'waiting' && Number.isFinite(passengerWaitLimit)) {
+          mission.elapsed = Math.min(passengerWaitLimit, mission.elapsed + 1);
+          if (mission.elapsed >= passengerWaitLimit) {
+            const expired = mission;
+            mission = null;
+            expireQueuedPassenger(expired, true);
+            if (!startNextCabinDelivery()) activateNextMission();
+          }
+        }
+
+        if (!mission && cabinPassengers.length) startNextCabinDelivery();
+        else if (!mission && !cabinPassengers.length) scheduleIdleCall(20);
+
+        updateMissionUI(); updateUI(); panelDirty = true;
+      }
+
+      function updateMissionUI() {
+        if (shiftEnded) {
+          els.missionCard.classList.add('urgent'); els.missionCard.classList.remove('done');
+          els.missionTitle.textContent='Смена окончена'; els.missionDetail.textContent='Смена завершена. Посмотрите итог.'; els.missionTimer.textContent='STOP'; return;
+        }
+        if (mode === 'free') {
+          els.missionCard.classList.remove('urgent','done'); els.missionTitle.textContent='Свободный режим';
+          els.missionDetail.textContent='Исследуйте этажи от −10 до 1 000 000 без заданий'; els.missionTimer.textContent='∞'; return;
+        }
+        if (!mission) {
+          els.missionCard.classList.remove('urgent','done');
+          if (cabinPassengers.length) {
+            els.missionTitle.textContent=`В кабине: ${cabinPassengers.length}`;
+            els.missionDetail.textContent='Пассажир уже в кабине и будет доставлен на выбранный этаж.';
+            els.missionTimer.textContent='∞';
+          } else {
+            els.missionTitle.textContent='Нет активного вызова';
+            els.missionDetail.textContent=idleCallInterval ? `Следующий автоматический вызов через ${Math.max(0,idleCallSeconds)} с. Одновременно может быть только один пассажир.` : 'Ожидание нового вызова.';
+            els.missionTimer.textContent=idleCallInterval?`${Math.max(0,idleCallSeconds)}s`:'--';
+          }
+          return;
+        }
+        els.missionCard.classList.toggle('done', mission.stage==='done');
+        const waitingUrgent = Number.isFinite(passengerWaitLimit) && passengerWaitLimit > 0 && mission.stage==='waiting' && mission.elapsed > passengerWaitLimit * .75;
+        els.missionCard.classList.toggle('urgent',waitingUrgent||mission.stage==='evacuating'||mission.stage==='jammed'||mission.stage==='aborted');
+        els.missionTimer.textContent=mission.stage==='jammed' ? `${Math.max(0,Math.ceil((jamState.deadline-Date.now())/1000))}s` : alarmGrace.active ? `AL ${Math.max(0,Math.ceil((alarmGrace.deadline-Date.now())/1000))}s` : mission.stage==='done'?'✓':mission.stage==='aborted'?'×':mission.stage==='waiting' && !Number.isFinite(passengerWaitLimit)?'∞':`${mission.elapsed}s`;
+        const queueInfo = ` Активен один пассажир. В кабине: ${cabinPassengers.length}.`;
+        if (mission.stage==='waiting') { els.missionTitle.textContent=`Вызов с этажа ${mission.from}`; els.missionDetail.textContent=`Пассажир хочет на этаж ${mission.to}. Заберите его лифтом B.${queueInfo}`; }
+        else if (mission.stage==='boarding') { els.missionTitle.textContent='Пассажир заходит в лифт'; els.missionDetail.textContent=`Подождите, пока он полностью войдёт. Если сейчас закрыть двери, его прижмёт. Рейтинг: ${passengerStars()}/5 ★.${queueInfo}`; }
+        else if (mission.stage==='jammed') { els.missionTitle.textContent='⚠ Пассажира прижало дверями'; els.missionDetail.textContent=autoMode ? `АВТО включает сигнализацию и освобождает пассажира. Рейтинг: ${passengerStars()}/5 ★.${queueInfo}` : `Срочно нажмите «Сигнализация». Через 10 секунд двери откроются сами и будет предупреждение. Рейтинг: ${passengerStars()}/5 ★.${queueInfo}`; }
+        else if (mission.stage==='riding') { els.missionTitle.textContent='Пассажир в лифте B'; els.missionDetail.textContent=autoMode ? `АВТО везёт пассажира на этаж ${mission.to}. Рейтинг: ${passengerStars()}/5 ★.${queueInfo}` : `Нажмите этаж ${mission.to}. Рейтинг: ${passengerStars()}/5 ★.${queueInfo}`; }
+        else if (mission.stage==='evacuating') { els.missionTitle.textContent='Пассажир покидает лифт B'; els.missionDetail.textContent=`Он услышал сигнализацию и выйдет при ближайшем открытии дверей.${queueInfo}`; }
+        else if (mission.stage==='aborted') { els.missionTitle.textContent='Поездка отменена'; els.missionDetail.textContent=`${mission.abortReason || 'Пассажир покинул лифт.'}${queueInfo}`; }
+        else { els.missionTitle.textContent='Доставка завершена'; els.missionDetail.textContent=`Переходим к следующему вызову.${queueInfo}`; }
+      }
+
+      function updateLiftUI() {
+        const floorDisplay = $('#floorB');
+        const floorText = formatFloor(lift.displayFloor);
+        floorDisplay.textContent = floorText;
+        floorDisplay.style.fontSize = floorText.length > 11 ? '23px' : floorText.length > 8 ? '30px' : floorText.length > 5 ? '38px' : '48px';
+        $('#upB').classList.toggle('visible', lift.direction > 0);
+        $('#downB').classList.toggle('visible', lift.direction < 0);
+        $('#idleB').style.display = lift.direction === 0 ? 'block' : 'none';
+        const door=$('#doorB');
+        door.classList.toggle('open', lift.door==='open'||lift.door==='opening');
+        door.classList.toggle('jammed', lift.door==='jammed'||jamState.active);
+        door.classList.toggle('moving', lift.moving);
+        const doorSignal=$('#doorSignalB');
+        if (doorSignal) {
+          // Arrival direction is preserved while the doors announce/open/stay open.
+          // During closing the lamp goes dark, as before. Once the car is fully idle
+          // with no selected trip, the direction defaults by the current floor:
+          // below floor 200 = down, floor 200 and above = up.
+          const tripDirection = lift.direction || lift.lastDirection;
+          const idleDirection = Math.round(lift.floor) < 200 ? -1 : 1;
+          const showingArrival = lift.door==='announcing' || lift.door==='opening' || lift.door==='open' || lift.door==='jammed';
+          const signalDirection = lift.moving ? (lift.direction || tripDirection || idleDirection)
+                                : showingArrival ? (tripDirection || idleDirection)
+                                : idleDirection;
+          const signalLit = lift.door !== 'closing';
+          doorSignal.src = signalLit ? 'assets/ecolit.jpg' : 'assets/ecounlit.jpg';
+          doorSignal.style.transform = signalDirection < 0 ? 'rotate(180deg)' : 'rotate(0deg)';
+          doorSignal.alt = signalLit ? (signalDirection < 0 ? 'Направление вниз' : 'Направление вверх') : 'Индикатор лифта';
+        }
+        const passengerEl=$('#passengerB');
+        const onboardCount = cabinPassengers.length;
+        if (onboardCount > 1) {
+          const shown = Math.min(6, onboardCount);
+          passengerEl.classList.add('stack');
+          passengerEl.innerHTML = Array.from({length:shown},()=>'<span class="stack-person">🧍</span>').join('') + (onboardCount>shown?`<span class="stack-more">+${onboardCount-shown}</span>`:'');
+        } else {
+          passengerEl.classList.remove('stack');
+          passengerEl.textContent = '🧍';
+        }
+        const boardingNow=!!mission && mission.stage==='boarding';
+        const jammedNow=jamState.active || (!!mission && mission.stage==='jammed');
+        passengerEl.classList.toggle('visible', (lift.passenger && lift.door==='open') || boardingNow || jammedNow);
+        passengerEl.classList.toggle('boarding', boardingNow);
+        passengerEl.classList.toggle('jammed', jammedNow);
+        updatePassengerRating();
+        let status='Двери закрыты';
+        if (lift.moving) status=lift.direction>0?'Движение вверх':'Движение вниз';
+        else if (lift.door==='announcing') status='Doors opening…';
+        else if (lift.door==='opening') status='Двери открываются';
+        else if (lift.door==='open') status='Двери открыты';
+        else if (lift.door==='closing') status='Двери закрываются';
+        else if (lift.door==='jammed') status='⚠ Двери заблокированы пассажиром';
+        $('#statusB').textContent=status;
+        $('#speedB').textContent=`${lift.speed.toFixed(1)} м/с`;
+        const queue=[lift.target,...lift.queue].filter(v=>v!=null);
+        $('#queueB').textContent=`Маршрут: ${queue.length?queue.join(' → '):'—'} · Пассажир: ${cabinPassengers.length ? 'в кабине' : '—'}`;
+        els.activeLift.textContent='B'; els.activeFloor.textContent=formatFloor(lift.displayFloor); els.activeSpeed.textContent=lift.speed.toFixed(1);
+        updateCCTV();
+      }
+
+      function updatePanelButtons() {
+        for (const b of floorButtons) {
+          const f=Number(b.dataset.floor);
+          b.classList.toggle('active',lift.queue.includes(f)||lift.target===f);
+          b.classList.toggle('current',f===lift.displayFloor);
+          b.classList.toggle('passing',lift.moving && f===lift.displayFloor);
+          b.classList.toggle('call',(!!mission&&mission.stage==='waiting'&&f===mission.from)||callQueue.some(c=>c.stage==='waiting'&&c.from===f));
+        }
+        panelDirty=false;
+      }
+
+      function updatePassingFloorButton(previousFloor, nextFloor) {
+        if (previousFloor === nextFloor) return;
+        if (!floorButtonMap.has(nextFloor) && Math.abs(nextFloor - floorWindowCenter) > Math.floor(FLOOR_WINDOW_SIZE * .42)) {
+          const now = performance.now();
+          if (now - lastFloorWindowRefresh > 320) {
+            lastFloorWindowRefresh = now;
+            renderFloorWindow(nextFloor);
+            updatePanelButtons();
+          }
+          return;
+        }
+        const oldBtn = floorButtonMap.get(previousFloor);
+        const newBtn = floorButtonMap.get(nextFloor);
+        if (oldBtn) oldBtn.classList.remove('current','passing');
+        if (newBtn) {
+          newBtn.classList.add('current');
+          newBtn.classList.toggle('passing', lift.moving);
+        }
+      }
+
+      function updateUI(forcePanel=false) {
+        updateLiftUI();
+        els.scoreText.textContent=Math.round(score); els.servedText.textContent=served; els.penaltyText.textContent=penalties;
+        els.callQueueText.textContent=waitingPassengerCount(); updateWarningsUI();
+        if (els.newCallBtn) els.newCallBtn.disabled = mode !== 'shift' || shiftEnded || Boolean(mission) || cabinPassengers.length > 0;
+        updatePassengerThought();
+        updateAutoThoughtUI();
+        if (forcePanel) updatePanelButtons();
+      }
+
+      function loop(now) {
+        const dt=Math.min(.06,(now-lastFrame)/1000); lastFrame=now;
+        const prevFloor=lift.displayFloor;
+        updateLiftPhysics(dt);
+        if (lift.displayFloor!==prevFloor) {
+          panelDirty=true;
+          flashDoorSignal(300);
+          // Синяя подсветка на панели следует за текущим этажом сразу, без
+          // обычной задержки перерисовки панели, чтобы её было видно и на высокой скорости.
+          updatePassingFloorButton(prevFloor, lift.displayFloor);
+        }
+        updateLiftUI();
+        if (panelDirty && now-lastPanelPaint>220) { updatePanelButtons(); lastPanelPaint=now; }
+        requestAnimationFrame(loop);
+      }
+
+      function toast(title,text) {
+        const div=document.createElement('div'); div.className='toast'; div.innerHTML=`<strong>${title}</strong><span>${text}</span>`;
+        els.toasts.appendChild(div); setTimeout(()=>div.remove(),3700);
+      }
+
+      function startGame(nextMode) {
+        mode=nextMode; shiftEnded=false; penalties=0; warnings=0; warningFlashFull=false; score=0; served=0; mission=null; callQueue=[]; cabinPassengers=[]; syncLiftPassengerFlag(); startedAt=Date.now();
+        autoMode=false; clearAutoTimers(); if (els.autoMode) els.autoMode.checked=false;
+        manualShiftFloor=null; manualShiftMissionId=null; autoHandoverError={active:false,floor:null,passengerId:null};
+        passengerWaitLimit = els.waitTimerSelect && els.waitTimerSelect.value !== 'inf' ? Number(els.waitTimerSelect.value) : Infinity;
+        clearBoardingTimer(); clearJamState(); clearAlarmGrace(); clearTimeout(autoMistakeTimer); autoMistakeTimer=null; failureState={active:false,kind:null,broken:new Set(),fixed:new Set()};
+        autoThoughtText='Автоматика отключена. Управление выполняется вручную.'; autoEventText='Последнее событие: —';
+        stopIdleCallTimer(); clearInterval(queueTick); clearTimeout(warningResetTimer); warningResetTimer=null;
+        document.body.classList.toggle('free-mode', mode==='free');
+        els.modeText.textContent=mode==='shift'?'Смена':'Свободный'; els.menu.classList.remove('active'); els.game.classList.add('active');
+        updateFreeFailureUI();
+        startMotor(); clearInterval(clockInterval);
+        clockInterval=setInterval(()=>{
+          const sec=Math.min(6000,Math.floor((Date.now()-startedAt)/1000));
+          els.clockText.textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+          if(mode==='shift' && sec>=6000 && !shiftEnded) endShift('Достигнут максимальный срок смены — 100 минут.');
+        },500);
+        if(mode==='shift') { queueTick=setInterval(tickPassengerCalls,1000); scheduleIdleCall(20); $('#buildingStatus').textContent='Система в норме'; } else { $('#buildingStatus').textContent='Свободный режим'; updateMissionUI(); }
+        updateUI(true);
+        toast('Система запущена',mode==='shift'?'Одновременно обслуживается один пассажир. Следующий автоматический вызов — через 20 секунд после завершения поездки.':'Свободное управление включено');
+      }
+
+      function bindHoldButton(el,action) {
+        const down=(e)=>{e.preventDefault();el.classList.add('pressed');playButtonPress();action();};
+        const up=()=>{el.classList.remove('pressed');};
+        el.addEventListener('pointerdown',down); ['pointerup','pointercancel','pointerleave'].forEach(evt=>el.addEventListener(evt,up));
+      }
+
+      buildFloorPanel(); updateUI(true); updateMissionUI(); requestAnimationFrame(loop);
+
+      document.querySelectorAll('.map-choice').forEach(btn => btn.addEventListener('click',()=>applyMapConfig(btn.dataset.map)));
+      applyMapConfig(selectedMap);
+      $('#startShift').addEventListener('click',()=>startGame('shift'));
+      $('#freeMode').addEventListener('click',()=>startGame('free'));
+      bindHoldButton($('#openBtn'),()=>openDoors(lift,true));
+      bindHoldButton($('#closeBtn'),()=>closeDoors(lift,true));
+      els.alarmBtn.addEventListener('click',()=>setAlarm(!alarmOn));
+      els.autoDoor.addEventListener('change',()=>{
+        if(els.autoDoor.checked){ if(lift.door==='open')scheduleAutoClose(); toast('Автодвери','После прибытия двери откроются и затем закроются автоматически'); }
+        else { clearTimeout(lift.doorTimer); lift.doorTimer=null; toast('Автодвери','Автоматическое закрытие отключено'); }
+      });
+      els.autoMode.addEventListener('change',()=>{
+        autoMode=els.autoMode.checked;
+        clearAutoTimers();
+        if(autoMode){
+          toast('Режим АВТО включён', mode==='shift' ? 'Лифт сам полностью обслужит текущего пассажира от вызова до нужного этажа.' : 'Лифт будет сам выбирать этажи и ездить по зданию.');
+          // Если управление включили обратно уже после посадки пассажира, а в
+          // движении осталась ручная цель, АВТО запоминает риск неправильной
+          // доставки. Сам маршрут не переписываем — это и создаёт запрошенный
+          // реалистичный сценарий ошибки автоматики.
+          if (mode === 'shift' && mission && mission.stage === 'riding' && manualShiftMissionId === mission.id && Number.isFinite(manualShiftFloor) && manualShiftFloor !== mission.to && (lift.target === manualShiftFloor || lift.queue.includes(manualShiftFloor))) {
+            autoHandoverError = { active:true, floor:manualShiftFloor, passengerId:mission.id };
+            setAutoThought(`Принимаю управление после ручного режима. В памяти осталась команда на этаж ${manualShiftFloor}.`, `передача управления · пассажиру нужен этаж ${mission.to}`);
+          } else {
+            autoHandoverError = { active:false, floor:null, passengerId:null };
+            setAutoThought(mode==='shift' ? 'Автоматика активна. Анализирую текущий пассажирский вызов.' : 'Автоматика активна. Выбираю свободный маршрут.', `АВТО включён · этаж ${Math.round(lift.floor)}`);
+          }
+          if(lift.door==='open') scheduleAutoClose(1400);
+          maybeRunAuto(250);
+        } else {
+          toast('Режим АВТО выключен','Управление снова полностью ручное.');
+          setAutoThought('Автоматика отключена. Управление выполняется вручную.', `АВТО выключен · этаж ${Math.round(lift.floor)}`);
+        }
+        updateMissionUI(); updateUI(true);
+      });
+      els.waitTimerSelect.addEventListener('change',()=>{
+        passengerWaitLimit = els.waitTimerSelect.value === 'inf' ? Infinity : Number(els.waitTimerSelect.value);
+        if (mission && mission.stage === 'waiting') mission.elapsed = 0;
+        toast('Ожидание пассажира', Number.isFinite(passengerWaitLimit) ? `Активный пассажир может ждать ${passengerWaitLimit} секунд.` : 'Активный пассажир может ждать бесконечно.');
+        updateMissionUI();
+      });
+      els.floorSearch.addEventListener('change',()=>{
+        const f=Number(els.floorSearch.value);
+        if(Number.isFinite(f)&&f>=MIN_FLOOR&&f<=MAX_FLOOR) { renderFloorWindow(f); requestFloor(f); }
+        else toast('Этаж недоступен',`Введите номер от −10 до ${formatRangeNumber(MAX_FLOOR)}`);
+        els.floorSearch.value='';
+      });
+      els.floorSearch.addEventListener('keydown',(e)=>{if(e.key==='Enter')els.floorSearch.dispatchEvent(new Event('change'));});
+      $('#newCallBtn').addEventListener('click',()=>{
+        if(shiftEnded)return;
+        if(mode==='free'){toast('Свободный режим','Переключитесь в режим смены для вызовов');return;}
+        addPassengerCall('manual');
+      });
+      els.breakLiftBtn.addEventListener('click', triggerManualFailure);
+      els.repairBtn.addEventListener('click', openRepairStation);
+      els.repairReturn.addEventListener('click', finishRepair);
+      els.repairOverlay.addEventListener('click',(e)=>{ if(e.target===els.repairOverlay && !failureState.active) els.repairOverlay.classList.remove('visible'); });
+
+      $('#soundBtn').addEventListener('click',()=>{
+        soundOn=!soundOn; $('#soundBtn').textContent=soundOn?'🔊':'🔇';
+        if(soundOn)startMotor(); else { setAlarm(false); Object.values(audio).forEach(stopAudio); cancelElevatorSpeech(); }
+      });
+      $('#helpBtn').addEventListener('click',()=>$('#helpOverlay').classList.add('visible'));
+      $('#closeHelp').addEventListener('click',()=>$('#helpOverlay').classList.remove('visible'));
+      $('#helpOverlay').addEventListener('click',(e)=>{if(e.target.id==='helpOverlay')e.currentTarget.classList.remove('visible');});
+      $('#menuBtn').addEventListener('click',()=>location.reload());
+      $('#restartShift').addEventListener('click',()=>location.reload());
+      document.addEventListener('keydown',(e)=>{if(e.key==='Escape')$('#helpOverlay').classList.toggle('visible');});
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+      }
+    })();
+  </script>
+</body>
+</html>
